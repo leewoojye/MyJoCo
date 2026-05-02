@@ -90,13 +90,73 @@ class EndEffector:
     geometry_records: List[GeometryRecord]
 
 
+class RobotState:
+    """Current robot joint state, separated from the body tree structure."""
+
+    def __init__(self, joint_names, qpos_addrs, qpos_widths, initial_qpos):
+        self.joint_names = list(joint_names)
+        self.joint_index = {name: i for i, name in enumerate(self.joint_names)}
+        self.qpos_addrs = dict(qpos_addrs)
+        self.qpos_widths = dict(qpos_widths)
+        self.qpos = np.asarray(initial_qpos, dtype=float).copy()
+
+    @classmethod
+    def from_model(cls, model, keyframe_name="home"):
+        joint_names = []
+        qpos_addrs = {}
+        qpos_widths = {}
+
+        for joint_id in range(model.njnt):
+            joint_name = get_mujoco_name(
+                model,
+                mujoco.mjtObj.mjOBJ_JOINT,
+                joint_id,
+                f"joint_{joint_id}",
+            )
+            joint_names.append(joint_name)
+            qpos_addrs[joint_name] = int(model.jnt_qposadr[joint_id])
+            qpos_widths[joint_name] = qpos_width_for_joint_type(model.jnt_type[joint_id])
+
+        return cls(
+            joint_names=joint_names,
+            qpos_addrs=qpos_addrs,
+            qpos_widths=qpos_widths,
+            initial_qpos=initial_qpos_from_keyframe(model, keyframe_name),
+        )
+
+    def get(self, joint_name):
+        qpos = self.get_qpos(joint_name)
+        if qpos.size == 1:
+            return float(qpos[0])
+        return qpos
+
+    def set(self, joint_name, value):
+        addr = self.qpos_addrs[joint_name]
+        width = self.qpos_widths[joint_name]
+        values = np.asarray(value, dtype=float).reshape(-1)
+
+        if values.size != width:
+            raise ValueError(f"{joint_name} expects {width} qpos value(s), got {values.size}")
+
+        self.qpos[addr:addr + width] = values
+
+    def get_qpos(self, joint_name):
+        addr = self.qpos_addrs[joint_name]
+        width = self.qpos_widths[joint_name]
+        return self.qpos[addr:addr + width].copy()
+
+    def as_dict(self):
+        return {joint_name: self.get(joint_name) for joint_name in self.joint_names}
+
+
 class RobotGeometries(list):
     """Open3D geometry list backed by a MuJoCo body tree."""
 
-    def __init__(self, model, data, body_nodes, root_body, records, end_effectors):
+    def __init__(self, model, data, state, body_nodes, root_body, records, end_effectors):
         super().__init__(root_body.all_geometries())
         self.model = model
         self.data = data
+        self.state = state
         self.body_nodes = body_nodes
         self.root_body = root_body
         self.records = records
@@ -120,6 +180,7 @@ class RobotGeometries(list):
         return self.root_body.all_geometries()
 
     def update_from_mujoco(self):
+        self.data.qpos[:] = self.state.qpos
         mujoco.mj_forward(self.model, self.data)
 
         for body_id, node in self.body_nodes.items():
@@ -172,6 +233,29 @@ def enum_name(enum_type, value):
         return enum_type(int(value)).name
     except ValueError:
         return str(int(value))
+
+
+def qpos_width_for_joint_type(joint_type):
+    joint_type = int(joint_type)
+    if joint_type == int(mujoco.mjtJoint.mjJNT_FREE):
+        return 7
+    if joint_type == int(mujoco.mjtJoint.mjJNT_BALL):
+        return 4
+    return 1
+
+
+def initial_qpos_from_keyframe(model, keyframe_name="home"):
+    if model.nkey == 0:
+        return np.zeros(model.nq)
+
+    key_id = 0
+    for candidate_id in range(model.nkey):
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_KEY, candidate_id)
+        if name == keyframe_name:
+            key_id = candidate_id
+            break
+
+    return model.key_qpos[key_id].copy()
 
 
 def quat_to_matrix(quat):
@@ -378,6 +462,8 @@ def build_robot_geometries(xml_path=XML_PATH):
     # 1. MuJoCo로 XML 파싱 및 초기 구조 불러오기
     model = mujoco.MjModel.from_xml_path(str(xml_path))
     data = mujoco.MjData(model)
+    state = RobotState.from_model(model)
+    data.qpos[:] = state.qpos
 
     # ⭐️ 핵심: 초기 상태(관절 각도 0)의 절대 좌표계(Global Position)를 단 한 번 계산합니다.
     # 이 함수를 쓰면 부모-자식 링크 간의 복잡한 행렬 곱셈을 무조코가 대신 해줍니다.
@@ -441,7 +527,7 @@ def build_robot_geometries(xml_path=XML_PATH):
             geometry_records=records_by_body_id.get(body_id, []),
         )
 
-    return RobotGeometries(model, data, body_nodes, root_body, records, end_effectors)
+    return RobotGeometries(model, data, state, body_nodes, root_body, records, end_effectors)
 
 
 def main():
@@ -450,6 +536,7 @@ def main():
     # 5. 조립된 전체 로봇 화면에 띄우기
     print("초기 로봇 렌더링 완료!")
     print(f"body nodes: {len(geometries.body_nodes)}")
+    print(f"joint states: {len(geometries.state.joint_names)}")
     print(f"render geometries: {len(geometries.open3d_geometries())}")
     if "left_hand" in geometries.end_effectors:
         print(f"left hand position: {geometries.end_effectors['left_hand'].position}")
