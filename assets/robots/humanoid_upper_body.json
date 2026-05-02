@@ -1,0 +1,51 @@
+{
+  "links": [
+    {
+      "name": "torso",
+      "parent": null,
+      "offset": [0.0, 0.0, 1.0],
+      "geom": {"type": "box", "size": [0.35, 0.2, 0.6]}
+    },
+    {
+      "name": "right_upper_arm",
+      "parent": "torso",
+      "joint": "right_shoulder_yaw",
+      "offset": [0.25, -0.18, 0.25],
+      "geom": {"type": "capsule", "radius": 0.04, "length": 0.3}
+    },
+    {
+      "name": "right_forearm",
+      "parent": "right_upper_arm",
+      "joint": "right_elbow",
+      "offset": [0.0, 0.0, -0.32],
+      "geom": {"type": "capsule", "radius": 0.035, "length": 0.3}
+    },
+    {
+      "name": "right_hand",
+      "parent": "right_forearm",
+      "joint": "right_wrist_pitch",
+      "offset": [0.0, 0.0, -0.25],
+      "geom": {"type": "sphere", "radius": 0.06}
+    }
+  ],
+  "joints": [
+    {
+      "name": "right_shoulder_yaw",
+      "type": "revolute",
+      "axis": [0, 0, 1],
+      "limit": [-1.57, 1.57]
+    },
+    {
+      "name": "right_elbow",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limit": [0.0, 2.4]
+    },
+    {
+      "name": "right_wrist_pitch",
+      "type": "revolute",
+      "axis": [1, 0, 0],
+      "limit": [-1.2, 1.2]
+    }
+  ]
+}

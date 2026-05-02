@@ -1,0 +1,20 @@
+<mujoco>
+  <option gravity="0 0 -9.81"/> <worldbody>
+    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
+    <geom type="plane" size="1 1 0.1" rgba=".9 .9 .9 1"/> <body name="link1" pos="0 0 0.1">
+      <joint name="joint1" type="hinge" axis="0 1 0"/> <geom type="capsule" fromto="0 0 0 0 0 0.4" size="0.04" rgba="0 .7 0 1"/>
+      
+      <body name="link2" pos="0 0 0.4">
+        <joint name="joint2" type="hinge" axis="0 1 0"/>
+        <geom type="capsule" fromto="0 0 0 0 0 0.4" size="0.04" rgba=".7 0 0 1"/>
+        <body name="hand" pos="0 0 0.4"> <site name="end_effector" pos="0 0 0" size="0.02" rgba="1 1 0 1"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="motor1" joint="joint1" gear="100"/>
+    <motor name="motor2" joint="joint2" gear="50"/>
+  </actuator>
+</mujoco>
