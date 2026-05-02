@@ -1,6 +1,6 @@
 import numpy as np
 
-# 4x4 skew-symmetric matrix 생성(반대칭 행렬)
+# 4x4 skew-symmetric matrix 생성
 def create_skew(vector):
   x1 = vector[0]
   x2 = vector[1]
@@ -18,8 +18,11 @@ def create_transform_matrix(R, p):
   T[:3, 3] = p
   return T
 
-# 단위회전축 ω와 각변위 θ로부터 회전행렬 생성
-def omega2rotation_matrix(w, theta):
-  skew_omega = create_skew(w)
-  skew_omega @ 
-  return np.eye(3) + np.sin(theta)
+# 동차변환행렬의 역행렬을 반환
+def inverse_T(T):
+  T = T.copy() # 값복사
+  R = T[:3, :3]
+  p = T[:3, 3]
+  T[:3, :3] = np.transpose(R)
+  T[:3, 3] = (-1) * np.transpose(R) @ p
+  return T
