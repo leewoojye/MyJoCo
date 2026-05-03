@@ -2,8 +2,10 @@ import numpy as np
 import open3d as o3d
 
 from sim.model.kinematics.fk import apply_fk
+from sim.model.kinematics.ik import apply_ik
 from sim.model.robot.loader_mujoco import build_robot_geometries
 from sim.model.robot.state import RobotState
+from sim.view.renderer import run_ik_target_window
 
 
 def create_grid(size=4.0, z=0.002, spacing=0.25, color=(0.55, 0.57, 0.60)):
@@ -64,10 +66,11 @@ def main():
         home_poses[node.name] = node.world_transform.copy()
 
     # robot 클래스 state와 독립적인 state 인스턴스 생성
-    state1 = RobotState.from_model(robot.model)
+    # state1 = RobotState.from_model(robot.model)
 
-    # robot 자체 state 인스턴스를 수정
-    state = robot.state
+    # 새로운 state 인스턴스 생성 예시
+    state = robot.state  # robot state 필드 참조, set()으로 수정 가능
+    # state = RobotState.from_model(robot.model)
     state.set("Joint1", 0.5)
     state.set("Joint2", -0.4)
     state.set("Joint3", 0.7)
@@ -79,18 +82,23 @@ def main():
     state.set("rh_l1", -0.3)
     state.set("rh_l2", 0.3)
 
-    robot = apply_fk(robot, state, home_poses)
+    robot = apply_fk(robot, robot.state, home_poses)
 
     # 5. 조립된 전체 로봇 화면에 띄우기
-    print("초기 로봇 렌더링 완료!")
     print(f"body nodes: {len(robot.body_nodes)}")
     print(f"joint states: {len(robot.state.joint_names)}")
     print(f"render geometries: {len(robot.open3d_geometries())}")
-    if "left_hand" in robot.end_effectors:
-        print(f"left hand position: {robot.end_effectors['left_hand'].position}")
+    # if "left_hand" in robot.end_effectors:
+    #     print(f"left hand position: {robot.end_effectors['left_hand'].position}")
+
+    # callback 함수
+    def handle_target_changed(target):
+        apply_ik(robot, robot.state, target, home_poses)
 
     # joint/link의 body frame 기준 행렬로 렌더링
-    draw_scene(robot)  # robot links, joints 그리고 배경 렌더링
+    run_ik_target_window(
+        robot, on_target_changed=handle_target_changed
+    )  # callback으로 연결
 
 
 if __name__ == "__main__":

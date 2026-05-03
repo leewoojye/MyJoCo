@@ -56,6 +56,7 @@ def solve_newton_raphson_coordinate(
     # )
     # theta = home_qpos
 
+    theta_prev = state.qpos.copy()
     theta = state.qpos.copy()  # 직전 IK의 해로 세타를 초기화
     iter = 0
 
@@ -64,7 +65,20 @@ def solve_newton_raphson_coordinate(
         link_poses = compute_fk(robot, state, M)
         e = target - link_poses["link6"][:3, 3]  # (추후 수정)
         J, joints = compute_position_jacobian(robot, link_poses)
-        dq = np.dot(np.linalg.pinv(J), e)
+
+        rows, cols = J.shape
+        if rows == cols:  # J is Full rank and square
+            dq = np.dot(np.linalg.pinv(J), e)
+        elif (
+            rows > cols
+        ):  # closest in the 2-norm sense, 원하는 task velocity를 모두 만들 수 없으니 가장 가까운 해를 찾음
+            dq = np.dot(np.linalg.pinv(J.T @ J) @ J.T, e)
+        else:  # smallest 2-norm among all solutions, 목표 velocity가 여러 개 있을 수 있으니 이 중 가장 작은 해를 고름
+            dq = np.dot(J.T @ np.linalg.pinv(J @ J.T), e)
+
+        # newton-raphson iteration 내에서 각변위 제한
+        # max_dq = 0.03  # 단위: rad
+        # dq = np.clip(dq, -max_dq, max_dq)
 
         # 계산된 관절 부위만 갱신함(ex. e.e와 root 사이의 관절각만 업데이트)
         for joint, dq_i in zip(joints, dq):
@@ -74,10 +88,16 @@ def solve_newton_raphson_coordinate(
         # if np.abs(e) <= 1e-4:
         if np.linalg.norm(e) <= 1e-4:
             break
-        if iter > 100:
+        if iter > 10:
             break
 
         iter += 1
+
+    # ik target panel 변화 단위로 각변위 제한
+    max_theta_step = 0.1
+    delta_theta = theta - theta_prev
+    delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
+    state.qpos = theta_prev + delta_theta
 
     return state
 

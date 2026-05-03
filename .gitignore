@@ -1,3 +1,5 @@
 /robotis_mujoco_menagerie/
 /venv/
 /note.md
+__pycache__/
+*.py[cod]
