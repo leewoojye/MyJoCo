@@ -1,3 +1,13 @@
 {
-  "git.ignoreLimitWarning": true
+  "git.ignoreLimitWarning": true,
+  "python.languageServer": "Pylance",
+  "python.analysis.indexing": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportUnusedImport": "none",
+    "reportUnusedVariable": "none",
+    "reportUnusedFunction": "none",
+    "reportUnusedClass": "none"
+  },
+  "ruff.lint.ignore": ["F401", "F841"]
 }
