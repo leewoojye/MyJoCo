@@ -37,7 +37,7 @@ def compute_position_jacobian(robot: RobotGeometries):
         S = unit_screw_axis(q, w, 0, joint["type"])
         v = S[3:, 0]
         J_i = np.cross(w, pos_ee) + v  # np.cross(omega, p_ee - q)
-        all_S.append(J_i)  # 회전 성분을 제외한 열벡터 append
+        all_S.append(J_i.reshape(3, 1))  # 회전 성분을 제외한 열벡터 append
 
     # 자코비안 열 인덱스와 joint id(qpos_addr)이 일치하지 않을 수 있어 관절 객체 리스트로 같이 반환
     return np.concatenate(all_S, axis=1), all_joints
