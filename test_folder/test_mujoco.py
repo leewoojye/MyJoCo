@@ -3,8 +3,8 @@ import open3d as o3d
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional
-
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_omy" / "scene.xml"
@@ -24,6 +24,14 @@ END_EFFECTOR_BODIES = {
     "right_ring_tip": "finger_r_link16",
     "right_little_tip": "finger_r_link20",
 }
+
+
+class JointType(Enum):
+    FREE = "free"
+    BALL = "ball"
+    SLIDE = "slide"
+    HINGE = "hinge"
+    UNKNOWN = "unknown"
 
 
 class MuJoCoBodyNode:
@@ -115,7 +123,9 @@ class RobotState:
             )
             joint_names.append(joint_name)
             qpos_addrs[joint_name] = int(model.jnt_qposadr[joint_id])
-            qpos_widths[joint_name] = qpos_width_for_joint_type(model.jnt_type[joint_id])
+            qpos_widths[joint_name] = qpos_width_for_joint_type(
+                model.jnt_type[joint_id]
+            )
 
         return cls(
             joint_names=joint_names,
@@ -136,14 +146,16 @@ class RobotState:
         values = np.asarray(value, dtype=float).reshape(-1)
 
         if values.size != width:
-            raise ValueError(f"{joint_name} expects {width} qpos value(s), got {values.size}")
+            raise ValueError(
+                f"{joint_name} expects {width} qpos value(s), got {values.size}"
+            )
 
-        self.qpos[addr:addr + width] = values
+        self.qpos[addr : addr + width] = values
 
     def get_qpos(self, joint_name):
         addr = self.qpos_addrs[joint_name]
         width = self.qpos_widths[joint_name]
-        return self.qpos[addr:addr + width].copy()
+        return self.qpos[addr : addr + width].copy()
 
     def as_dict(self):
         return {joint_name: self.get(joint_name) for joint_name in self.joint_names}
@@ -152,7 +164,9 @@ class RobotState:
 class RobotGeometries(list):
     """Open3D geometry list backed by a MuJoCo body tree."""
 
-    def __init__(self, model, data, state, body_nodes, root_body, records, end_effectors):
+    def __init__(
+        self, model, data, state, body_nodes, root_body, records, end_effectors
+    ):
         super().__init__(root_body.all_geometries())
         self.model = model
         self.data = data
@@ -235,11 +249,26 @@ def enum_name(enum_type, value):
         return str(int(value))
 
 
-def qpos_width_for_joint_type(joint_type):
+def joint_type_from_mujoco(joint_type):
     joint_type = int(joint_type)
     if joint_type == int(mujoco.mjtJoint.mjJNT_FREE):
-        return 7
+        return JointType.FREE
     if joint_type == int(mujoco.mjtJoint.mjJNT_BALL):
+        return JointType.BALL
+    if joint_type == int(mujoco.mjtJoint.mjJNT_SLIDE):
+        return JointType.SLIDE
+    if joint_type == int(mujoco.mjtJoint.mjJNT_HINGE):
+        return JointType.HINGE
+    return JointType.UNKNOWN
+
+
+def qpos_width_for_joint_type(joint_type):
+    if not isinstance(joint_type, JointType):
+        joint_type = joint_type_from_mujoco(joint_type)
+
+    if joint_type == JointType.FREE:
+        return 7
+    if joint_type == JointType.BALL:
         return 4
     return 1
 
@@ -260,11 +289,13 @@ def initial_qpos_from_keyframe(model, keyframe_name="home"):
 
 def quat_to_matrix(quat):
     w, x, y, z = quat
-    return np.array([
-        [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-        [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-        [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
-    ])
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
 
 
 def make_transform(position, rotation_matrix):
@@ -373,8 +404,9 @@ def draw_scene(robot_geometries):
     vis.destroy_window()
 
 
-def create_joint_record(model, joint_id):
+def create_joint_record(model, data, joint_id):
     dof_id = int(model.jnt_dofadr[joint_id])
+    joint_type = joint_type_from_mujoco(model.jnt_type[joint_id])
     joint = {
         "joint_id": joint_id,
         "name": get_mujoco_name(
@@ -383,9 +415,11 @@ def create_joint_record(model, joint_id):
             joint_id,
             f"joint_{joint_id}",
         ),
-        "type": enum_name(mujoco.mjtJoint, model.jnt_type[joint_id]),
+        "type": joint_type,
         "axis": model.jnt_axis[joint_id].copy(),
         "pos": model.jnt_pos[joint_id].copy(),
+        "world_axis": data.xaxis[joint_id].copy(),
+        "world_pos": data.xanchor[joint_id].copy(),
         "range": model.jnt_range[joint_id].copy(),
         "limited": bool(model.jnt_limited[joint_id]),
         "qpos_addr": int(model.jnt_qposadr[joint_id]),
@@ -444,7 +478,7 @@ def build_body_nodes(model, data):
         joint_num = int(model.body_jntnum[body_id])
         if joint_addr >= 0 and joint_num > 0:
             node.joints = [
-                create_joint_record(model, joint_id)
+                create_joint_record(model, data, joint_id)
                 for joint_id in range(joint_addr, joint_addr + joint_num)
             ]
 
@@ -527,22 +561,49 @@ def build_robot_geometries(xml_path=XML_PATH):
             geometry_records=records_by_body_id.get(body_id, []),
         )
 
-    return RobotGeometries(model, data, state, body_nodes, root_body, records, end_effectors)
+    return RobotGeometries(
+        model, data, state, body_nodes, root_body, records, end_effectors
+    )
 
 
 def main():
-    geometries = build_robot_geometries()
+    # 순환 import 방지
+    from sim.kinematics.fk import compute_fk, apply_fk
+
+    robot = build_robot_geometries()
+    # home configuration 저장
+    home_poses = {}
+    for node in robot.root_body.iter_nodes():
+        home_poses[node.name] = node.world_transform.copy()
+
+    # robot 클래스 state와 독립적인 state 인스턴스 생성
+    state1 = RobotState.from_model(robot.model)
+
+    # robot 자체 state 인스턴스를 수정
+    state = robot.state
+    state.set("Joint1", 0.5)
+    state.set("Joint2", -0.4)
+    state.set("Joint3", 0.7)
+    state.set("Joint4", -0.6)
+    state.set("Joint5", 0.3)
+    state.set("Joint6", 0.2)
+    state.set("rh_r1", 0.3)
+    state.set("rh_r2", -0.3)
+    state.set("rh_l1", -0.3)
+    state.set("rh_l2", 0.3)
+
+    robot = apply_fk(robot, state, home_poses)
 
     # 5. 조립된 전체 로봇 화면에 띄우기
     print("초기 로봇 렌더링 완료!")
-    print(f"body nodes: {len(geometries.body_nodes)}")
-    print(f"joint states: {len(geometries.state.joint_names)}")
-    print(f"render geometries: {len(geometries.open3d_geometries())}")
-    if "left_hand" in geometries.end_effectors:
-        print(f"left hand position: {geometries.end_effectors['left_hand'].position}")
+    print(f"body nodes: {len(robot.body_nodes)}")
+    print(f"joint states: {len(robot.state.joint_names)}")
+    print(f"render geometries: {len(robot.open3d_geometries())}")
+    if "left_hand" in robot.end_effectors:
+        print(f"left hand position: {robot.end_effectors['left_hand'].position}")
 
-    
-    draw_scene(geometries) # robot links, joints 그리고 배경 렌더링
+    # joint/link의 body frame 기준 행렬로 렌더링
+    draw_scene(robot)  # robot links, joints 그리고 배경 렌더링
 
 
 if __name__ == "__main__":

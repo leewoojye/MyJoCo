@@ -1,5 +1,5 @@
 import numpy as np
-from sim.math3d.rotation import skew
+from sim.math3d.rotation import create_skew
 
 # q: position, s: screw axis, h: pitch
 def unit_screw_axis(q, s, h, joint_type):
@@ -12,10 +12,14 @@ def unit_screw_axis(q, s, h, joint_type):
     raise ValueError("s must be nonzero")
   s = s / norm
 
-  # 회전관절인 경우 회전축은 0, 속도 v에는 선속도 성분만 남음
-  if joint_type == "prismatic":
+  # 직선관절인 경우 회전축은 0, 속도 v에는 선속도 성분만 남음
+  if joint_type == "slide": 
     w = np.zeros(3)
     v = s
+  elif joint_type == "hinge": # 회전관절
+    w = s
+    v = -np.cross(s,q)
+    # v = -np.cross(s, q) + h * s
   else:
     w = s
     v = -np.cross(s, q) + h * s
@@ -23,13 +27,14 @@ def unit_screw_axis(q, s, h, joint_type):
   S = np.concatenate((w, v)).reshape(6, 1)
   return S
 
+
 def screw_hat(S):
   S = np.asarray(S, dtype=float).reshape(6,)
   w = S[:3]
   v = S[3:]
   
   S_hat = np.zeros((4, 4))
-  S_hat[:3, :3] = skew(w)
+  S_hat[:3, :3] = create_skew(w)
   S_hat[:3, 3] = v
 
   return S_hat
