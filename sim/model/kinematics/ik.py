@@ -57,13 +57,18 @@ def solve_newton_raphson_coordinate(
     # theta = home_qpos
 
     theta = state.qpos.copy()  # 직전 IK의 해로 세타를 초기화
-
     iter = 0
+
     while True:
         state.qpos = theta.copy()
-        e = target - compute_fk(robot, state, M)["link6"][:3, 3]  # (추후 수정)
-        J, joints = compute_position_jacobian(robot)
-        theta = theta + np.dot(np.linalg.pinv(J), e)
+        link_poses = compute_fk(robot, state, M)
+        e = target - link_poses["link6"][:3, 3]  # (추후 수정)
+        J, joints = compute_position_jacobian(robot, link_poses)
+        dq = np.dot(np.linalg.pinv(J), e)
+
+        # 계산된 관절 부위만 갱신함(ex. e.e와 root 사이의 관절각만 업데이트)
+        for joint, dq_i in zip(joints, dq):
+            theta[joint["qpos_addr"]] += dq_i
 
         # e가 벡터일 경우 불린 배열을 반환하여 조건문이 애매해짐
         # if np.abs(e) <= 1e-4:

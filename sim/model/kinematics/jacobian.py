@@ -21,10 +21,14 @@ def append_joints(all_joints, node: MuJoCoBodyNode):
 
 
 # omy의 e.e를 position jacobian으로 다루기
-def compute_position_jacobian(robot: RobotGeometries):
+# IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
+def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for("link6")
-    pos_ee = target.world_transform[:3, 3]
+    target_transform = (
+        link_poses[target.name] if link_poses is not None else target.world_transform
+    )
+    pos_ee = target_transform[:3, 3]
 
     all_joints = []
     append_joints(all_joints, target)
