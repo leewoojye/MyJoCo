@@ -1,6 +1,7 @@
 import stat
 
 import numpy as np
+import scipy
 from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
 from sim.model.math3d.rotation import omega2rotation_matrix
@@ -30,7 +31,8 @@ def calculate_twist_error(T_sb, T_sd):
     T_error = T_sb_inv @ T_sd
     # T_error = np.dot(T_sb_inv, T_sd)
 
-    V_b_mat = np.log(T_error)
+    V_b_mat = scipy.linalg.logm(T_error)
+    # V_b_mat = np.log(T_error) # np.log는 matrix logarithm이 아니라 element-wise log
 
     # 허수부 오차 제거
     V_b_mat = np.real(V_b_mat)
