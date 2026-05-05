@@ -16,7 +16,7 @@ def run_ik_target_window(
     robot_geometries,
     initial_target=None,
     on_target_changed=None,
-    slider_range=(-0.2, 0.2),  # end-effector 조작 범위(단위: m)
+    slider_range=(-0.5, 0.5),  # end-effector 조작 범위(단위: m)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
 ):
     app = gui.Application.instance

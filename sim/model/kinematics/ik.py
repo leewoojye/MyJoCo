@@ -8,7 +8,11 @@ from sim.model.math3d.rotation import omega2rotation_matrix
 from sim.model.math3d.transform import create_transform_matrix
 from sim.model.robot.robot_model import RobotGeometries
 from sim.model.robot.state import RobotState
-from sim.model.kinematics.jacobian import compute_position_jacobian
+from sim.model.math3d.lie import Adjoint
+from sim.model.kinematics.jacobian import (
+    compute_position_jacobian,
+    compute_geometric_jacobian,
+)
 
 
 # 감쇠 역행렬
@@ -44,9 +48,10 @@ def calculate_twist_error(T_sb, T_sd):
     v_y = V_b_mat[1, 3]
     v_z = V_b_mat[2, 3]
 
-    V_b_vec = np.array([w_x, w_y, w_z, v_x, v_y, v_z])
+    V_b = np.array([w_x, w_y, w_z, v_x, v_y, v_z])
 
-    return V_b_mat, V_b_vec
+    # V_b hat 연산 결과(행렬)와 벡터 모두 반환
+    return V_b_mat, V_b
 
 
 def solve_newton_raphson_coordinate(
@@ -95,11 +100,12 @@ def solve_newton_raphson_coordinate(
 
         iter += 1
 
-    # ik target panel 변화 단위로 각변위 제한
+    # 각변위 제한 (rad), 추후 수정
     max_theta_step = 0.1
     delta_theta = theta - theta_prev
     delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
     state.qpos = theta_prev + delta_theta
+    # state.qpos = theta
 
     return state
 
@@ -107,11 +113,49 @@ def solve_newton_raphson_coordinate(
 def solve_newton_raphson_geometric(
     robot: RobotGeometries, state: RobotState, target, M
 ):
-    # theta = M
-    # e = target - compute_fk(robot, state, target, theta)
-    # T_sd =
-    # skew_Vb = np.log(np.linalg.inv())
-    # delta = theta + np.linalg.pinv(compute_position_jacobian(robot)) @
+    T_sb = robot.body_node_for(target)["world_transform"]
+    T_sd = T_sb.copy()
+    T_sd[:3, 3] = target
+    twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
+
+    theta_prev = state.qpos.copy()
+    theta = state.qpos.copy()
+    iter = 0
+
+    while True:
+        state.qpos = theta.copy()
+        link_poses = compute_fk(robot, state, M)
+        e = target - link_poses["hx5_r_base"][:3, 3]
+        # space frame 기준 자코비안 행렬 J
+        J, joints = compute_geometric_jacobian(robot, link_poses)
+
+        J_b = Adjoint(J)  # body frame로의 좌표계 변환을 위해 big adjoint 연산 수행
+        rows, cols = J_b.shape
+
+        if rows == cols:
+            dq = np.dot(np.linalg.pinv(J_b), e) @ twist_error
+        elif rows > cols:
+            dq = np.dot(np.linalg.pinv(J_b.T @ J_b) @ J_b.T, e) @ twist_error
+        else:
+            dq = np.dot(J_b.T @ np.linalg.pinv(J_b @ J_b.T), e) @ twist_error
+
+        for joint, dq_i in zip(joints, dq):
+            theta[joint["qpos_addr"]] += dq_i
+
+        if np.linalg.norm(e) <= 1e-4:
+            break
+        if iter > 10:
+            break
+
+        iter += 1
+
+    # 각변위 제한 (rad), 추후 수정
+    max_theta_step = 0.1
+    delta_theta = theta - theta_prev
+    delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
+    state.qpos = theta_prev + delta_theta
+    # state.qpos = theta
+
     return
 
 
@@ -121,19 +165,22 @@ def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M):
 
 
 # position + pose (6D twist) 기반 자코비안 행렬 활용
-def solve_pose_ik_recursive():
-    return
+# def solve_pose_ik_recursive():
+#     return
 
 
 # position + pose (6D twist) 기반 자코비안 행렬 활용
-# 관절각 계산만
+# target: input position, (3,)
 def solve_pose_ik(robot: RobotGeometries, state: RobotState, target, M):
-    return
+    new_state = solve_newton_raphson_coordinate(robot, state, target, M)
+
+    return new_state
 
 
 # 계산된 관절각 적용
 def apply_ik(robot: RobotGeometries, state: RobotState, target, M):
-    new_state = solve_position_ik(robot, state, target, M)
+    # new_state = solve_position_ik(robot, state, target, M)
+    new_state = solve_pose_ik(robot, state, target, M)
     robot = apply_fk(robot, new_state, M)
 
     return robot

@@ -12,7 +12,7 @@ from sim.model.robot.robot_model import RobotGeometries
 from sim.model.robot.state import RobotState
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "ffw_sh5.xml"
+XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "scene_ffw_sh5.xml"
 
 END_EFFECTOR_BODIES = {
     "left_hand": "hx5_l_base",

@@ -75,26 +75,34 @@ def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
 
 
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
-def compute_geometric_jacobian(robot: RobotGeometries):
+def compute_geometric_jacobian(robot: RobotGeometries, link_poses=None):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for("hx5_r_base")
     # parent = target.parent.copy()
     # J = np.zeros(6, target.joints["joint_id"])  # 6xn (n: e.e까지 관절개수) 행렬 초기화
 
     all_joints = []
-    append_joints(all_joints, target)
+    append_joints(all_joints, target, include_nodes=True)
     # all_joints.sort(
     #     key=lambda joint: joint["qpos_addr"]
     # )  # joint id 기준으로 오름차순 정렬 (추후 수정)
 
     # 자코비안 행렬은 e.e에서 root까지 단일 경로만 고려
     all_S = []
-    for joint in all_joints:  # 회전관절 가정 (추후 수정)
-        J_i = unit_screw_axis(joint["world_pos"], joint["world_axis"], 0, joint["type"])
+    joints = []
+    for node, joint in all_joints:  # 회전관절 가정 (추후 수정)
+        joint_transform = (
+            link_poses[node.name] if link_poses is not None else node.world_transform
+        )
+
+        q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
+        w = joint_transform[:3, :3] @ joint["axis"]
+        J_i = unit_screw_axis(q, w, 0, joint["type"])
         all_S.append(J_i)  # 열벡터 append
+        joints.append(joint)
 
     # 자코비안 열 인덱스와 joint id(qpos_addr)이 일치하지 않을 수 있어 관절 객체 리스트로 같이 반환
-    return np.concatenate(all_S, axis=1), all_joints
+    return np.concatenate(all_S, axis=1), joints
 
 
 def finite_difference_position_jacobian():
