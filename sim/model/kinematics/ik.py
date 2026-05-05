@@ -113,10 +113,10 @@ def solve_newton_raphson_coordinate(
 def solve_newton_raphson_geometric(
     robot: RobotGeometries, state: RobotState, target, M
 ):
-    T_sb = robot.body_node_for(target)["world_transform"]
+    T_sb = robot.body_node_for("hx5_r_base").world_transform
     T_sd = T_sb.copy()
     T_sd[:3, 3] = target
-    twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
+    # twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
 
     theta_prev = state.qpos.copy()
     theta = state.qpos.copy()
@@ -125,24 +125,28 @@ def solve_newton_raphson_geometric(
     while True:
         state.qpos = theta.copy()
         link_poses = compute_fk(robot, state, M)
-        e = target - link_poses["hx5_r_base"][:3, 3]
+        T_sb = link_poses["hx5_r_base"]
+        twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
+
         # space frame 기준 자코비안 행렬 J
         J, joints = compute_geometric_jacobian(robot, link_poses)
 
-        J_b = Adjoint(J)  # body frame로의 좌표계 변환을 위해 big adjoint 연산 수행
+        J_b = (
+            Adjoint(np.linalg.inv(T_sb)) @ J
+        )  # body frame로의 좌표계 변환을 위해 big adjoint 연산 수행
         rows, cols = J_b.shape
 
         if rows == cols:
-            dq = np.dot(np.linalg.pinv(J_b), e) @ twist_error
+            dq = np.linalg.pinv(J_b) @ twist_error
         elif rows > cols:
-            dq = np.dot(np.linalg.pinv(J_b.T @ J_b) @ J_b.T, e) @ twist_error
+            dq = np.linalg.pinv(J_b.T @ J_b) @ J_b.T @ twist_error
         else:
-            dq = np.dot(J_b.T @ np.linalg.pinv(J_b @ J_b.T), e) @ twist_error
+            dq = J_b.T @ np.linalg.pinv(J_b @ J_b.T) @ twist_error
 
         for joint, dq_i in zip(joints, dq):
             theta[joint["qpos_addr"]] += dq_i
 
-        if np.linalg.norm(e) <= 1e-4:
+        if np.linalg.norm(twist_error) <= 1e-4:
             break
         if iter > 10:
             break
@@ -156,7 +160,7 @@ def solve_newton_raphson_geometric(
     state.qpos = theta_prev + delta_theta
     # state.qpos = theta
 
-    return
+    return state
 
 
 def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M):
@@ -172,7 +176,7 @@ def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M):
 # position + pose (6D twist) 기반 자코비안 행렬 활용
 # target: input position, (3,)
 def solve_pose_ik(robot: RobotGeometries, state: RobotState, target, M):
-    new_state = solve_newton_raphson_coordinate(robot, state, target, M)
+    new_state = solve_newton_raphson_geometric(robot, state, target, M)
 
     return new_state
 
