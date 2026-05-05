@@ -65,7 +65,7 @@ def solve_newton_raphson_coordinate(
     while True:
         state.qpos = theta.copy()
         link_poses = compute_fk(robot, state, M)
-        e = target - link_poses["link6"][:3, 3]  # (추후 수정)
+        e = target - link_poses["hx5_r_base"][:3, 3]  # (추후 수정)
         J, joints = compute_position_jacobian(robot, link_poses)
 
         rows, cols = J.shape

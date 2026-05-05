@@ -55,15 +55,21 @@ from sim.model.robot.state import RobotState
 
 # root body에서 시작해 재귀적으로 transform matrix 계산
 def compute_fk_all_links_recursive(
-    node: MuJoCoBodyNode, state: RobotState, M, cum_T, all_link_poses
+    node: MuJoCoBodyNode,
+    state: RobotState,
+    M,
+    cum_T,
+    all_link_poses,
+    include_node_joints=True,
 ):
-    for joint in node.joints:
-        # space frame 기준 관절정보를 가져옴
-        q = joint["world_pos"]
-        w = joint["world_axis"]
-        S = unit_screw_axis(q, w, 0, joint["type"])
-        S_exp = screw_hat(S) * state.get(joint["name"])
-        cum_T = cum_T @ expm(S_exp)
+    if include_node_joints:
+        for joint in node.joints:
+            # space frame 기준 관절정보를 가져옴
+            q = joint["world_pos"]
+            w = joint["world_axis"]
+            S = unit_screw_axis(q, w, 0, joint["type"])
+            S_exp = screw_hat(S) * state.get(joint["name"])
+            cum_T = cum_T @ expm(S_exp)
 
     all_link_poses[node.name] = cum_T @ M[node.name]
 
@@ -77,8 +83,10 @@ def compute_fk(robot: RobotGeometries, state: RobotState, M):
     # all_link_poses를 전역변수로 선언하면 compute_fk를 동시에 호출할 때 문제가 됨
     all_link_poses = {}
     T = np.eye(4)
-    root_node = robot.root_body
-    compute_fk_all_links_recursive(root_node, state, M, T, all_link_poses)
+    root_node = robot.body_node_for("lift_link") or robot.root_body
+    compute_fk_all_links_recursive(
+        root_node, state, M, T, all_link_poses, include_node_joints=False
+    )
     return all_link_poses
 
 
@@ -86,10 +94,12 @@ def compute_fk(robot: RobotGeometries, state: RobotState, M):
 def apply_fk(robot: RobotGeometries, state: RobotState, M):
     all_link_poses = {}
     T = np.eye(4)
-    root_node = robot.root_body
-    compute_fk_all_links_recursive(root_node, state, M, T, all_link_poses)
+    root_node = robot.body_node_for("lift_link") or robot.root_body
+    compute_fk_all_links_recursive(
+        root_node, state, M, T, all_link_poses, include_node_joints=False
+    )
 
-    for node in robot.root_body.iter_nodes():
+    for node in root_node.iter_nodes():
         old_T = node.world_transform
         new_T = all_link_poses[node.name]
 

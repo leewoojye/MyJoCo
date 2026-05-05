@@ -6,10 +6,10 @@ from sim.view.gui.target_panel import IKTargetPanel
 
 
 def _link6_position(robot_geometries):
-    link6 = robot_geometries.body_node_for("link6")
-    if link6 is None:
-        raise ValueError("link6 body node not found")
-    return link6.world_transform[:3, 3]
+    r_hand = robot_geometries.body_node_for("hx5_r_base")
+    if r_hand is None:
+        raise ValueError("r_hand body node not found")
+    return r_hand.world_transform[:3, 3]
 
 
 def run_ik_target_window(

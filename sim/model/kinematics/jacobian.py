@@ -8,10 +8,23 @@ from sim.model.robot.robot_model import RobotGeometries
 from sim.model.robot.state import RobotState
 
 
-def append_joints(all_joints, node: MuJoCoBodyNode, include_nodes=False):
+def append_joints(
+    all_joints,
+    node: MuJoCoBodyNode,
+    include_nodes=False,
+    root_body_name="lift_link",
+):
+    if node.name == root_body_name:
+        return
+
     # 부모 노드는 1개로 가정
     if node.parent is not None:
-        append_joints(all_joints, node.parent, include_nodes=include_nodes)
+        append_joints(
+            all_joints,
+            node.parent,
+            include_nodes=include_nodes,
+            root_body_name=root_body_name,
+        )
 
     # 여러 관절을 갖는 링크를 고려해 매스텝마다 joint 정렬해줌
     for joint in sorted(node.joints, key=lambda joint: joint["qpos_addr"]):
@@ -24,7 +37,7 @@ def append_joints(all_joints, node: MuJoCoBodyNode, include_nodes=False):
 # IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
 def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
-    target = robot.body_node_for("link6")
+    target = robot.body_node_for("hx5_r_base")
     target_transform = (
         link_poses[target.name] if link_poses is not None else target.world_transform
     )
@@ -64,7 +77,7 @@ def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
 def compute_geometric_jacobian(robot: RobotGeometries):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
-    target = robot.body_node_for("link6")
+    target = robot.body_node_for("hx5_r_base")
     # parent = target.parent.copy()
     # J = np.zeros(6, target.joints["joint_id"])  # 6xn (n: e.e까지 관절개수) 행렬 초기화
 

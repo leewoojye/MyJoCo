@@ -71,16 +71,47 @@ def main():
     # 새로운 state 인스턴스 생성 예시
     state = robot.state  # robot state 필드 참조, set()으로 수정 가능
     # state = RobotState.from_model(robot.model)
-    state.set("Joint1", 0.5)
-    state.set("Joint2", -0.4)
-    state.set("Joint3", 0.7)
-    state.set("Joint4", -0.6)
-    state.set("Joint5", 0.3)
-    state.set("Joint6", 0.2)
-    state.set("rh_r1", 0.3)
-    state.set("rh_r2", -0.3)
-    state.set("rh_l1", -0.3)
-    state.set("rh_l2", 0.3)
+    # state.set("Joint1", 0.5)
+    # state.set("Joint2", -0.4)
+    # state.set("Joint3", 0.7)
+    # state.set("Joint4", -0.6)
+    # state.set("Joint5", 0.3)
+    # state.set("Joint6", 0.2)
+    # state.set("rh_r1", 0.3)
+    # state.set("rh_r2", -0.3)
+    # state.set("rh_l1", -0.3)
+    # state.set("rh_l2", 0.3)
+
+    state.set("lift_joint", -0.15)
+
+    state.set("head_joint1", 0.0)
+    state.set("head_joint2", 0.0)
+
+    state.set("arm_l_joint1", 0.0)
+    state.set("arm_l_joint2", 0.0)
+    state.set("arm_l_joint3", 0.0)
+    state.set("arm_l_joint4", -1.57)
+    state.set("arm_l_joint5", 0.0)
+    state.set("arm_l_joint6", 0.0)
+    state.set("arm_l_joint7", 0.0)
+
+    state.set("arm_r_joint1", 0.0)
+    state.set("arm_r_joint2", 0.0)
+    state.set("arm_r_joint3", 0.0)
+    state.set("arm_r_joint4", -1.57)
+    state.set("arm_r_joint5", 0.0)
+    state.set("arm_r_joint6", 0.0)
+    state.set("arm_r_joint7", 0.0)
+
+    state.set("finger_l_joint1", 0.0)
+    state.set("finger_l_joint2", 2.09)
+    state.set("finger_l_joint3", 0.0)
+    state.set("finger_l_joint4", 0.0)
+
+    state.set("finger_r_joint1", 0.0)
+    state.set("finger_r_joint2", -2.09)
+    state.set("finger_r_joint3", 0.0)
+    state.set("finger_r_joint4", 0.0)
 
     robot = apply_fk(robot, robot.state, home_poses)
 
