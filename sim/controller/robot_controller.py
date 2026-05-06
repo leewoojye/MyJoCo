@@ -1,8 +1,10 @@
 import numpy as np
 import open3d as o3d
+import time
 
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
+from sim.model.motion.trajectory import interpolate_position
 from sim.model.robot.loader_mujoco import build_robot_geometries
 from sim.model.robot.state import RobotState
 from sim.view.renderer import run_ik_target_window
@@ -66,21 +68,21 @@ def main():
         home_poses[node.name] = node.world_transform.copy()
 
     # robot 클래스 state와 독립적인 state 인스턴스 생성
-    # state1 = RobotState.from_model(robot.model)
-
-    # 새로운 state 인스턴스 생성 예시
-    state = robot.state  # robot state 필드 참조, set()으로 수정 가능
     # state = RobotState.from_model(robot.model)
-    # state.set("Joint1", 0.5)
-    # state.set("Joint2", -0.4)
-    # state.set("Joint3", 0.7)
-    # state.set("Joint4", -0.6)
-    # state.set("Joint5", 0.3)
-    # state.set("Joint6", 0.2)
-    # state.set("rh_r1", 0.3)
-    # state.set("rh_r2", -0.3)
-    # state.set("rh_l1", -0.3)
-    # state.set("rh_l2", 0.3)
+
+    # 새로운 state 인스턴스 생성 예시 (omy.xml)
+    state = robot.state  # robot state 필드 참조, set()으로 수정 가능
+    # state_omy = RobotState.from_model(robot.model)
+    # state_omy.set("Joint1", 0.5)
+    # state_omy.set("Joint2", -0.4)
+    # state_omy.set("Joint3", 0.7)
+    # state_omy.set("Joint4", -0.6)
+    # state_omy.set("Joint5", 0.3)
+    # state_omy.set("Joint6", 0.2)
+    # state_omy.set("rh_r1", 0.3)
+    # state_omy.set("rh_r2", -0.3)
+    # state_omy.set("rh_l1", -0.3)
+    # state_omy.set("rh_l2", 0.3)
 
     # 관절에 대한 자세만 지정함, 관절의 자세가 하위 링크/바디의 자세 결정
     state.set("lift_joint", -0.15)
@@ -120,20 +122,42 @@ def main():
     }
     home_poses["_qpos"] = robot.state.qpos.copy()
 
-    # 5. 조립된 전체 로봇 화면에 띄우기
-    print(f"body nodes: {len(robot.body_nodes)}")
-    print(f"joint states: {len(robot.state.joint_names)}")
-    print(f"render geometries: {len(robot.open3d_geometries())}")
-    # if "left_hand" in robot.end_effectors:
-    #     print(f"left hand position: {robot.end_effectors['left_hand'].position}")
+    trajectory_start = None
+    trajectory_goal = None
+    trajectory_start_time = None
+    trajectory_duration = 1.0  # 단일 궤적 시간 고정
 
     # callback 함수
-    def handle_target_changed(target):
-        apply_ik(robot, robot.state, target, home_poses)
+    # 패널입력, 시간을 받아 궤적 생성 ->
+    def handle_target_changed(target_pos):
+        nonlocal trajectory_start, trajectory_goal, trajectory_start_time
+        trajectory_start = (
+            robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
+        )
+        # 타겟패널입력은 새로운 궤적 생성 타이밍에 관여하며, 입력을 감지하면 trajectory 관련 변수를 갱신함
+        trajectory_goal = target_pos.copy()
+        trajectory_start_time = time.perf_counter()
+
+    # 패널 감지 콜백함수가 궤적 생성 시점에 관여한다면, tick(유사 clock) 콜백함수가 로봇의 실제 ik 적용과 렌더링을 맡음
+    def handle_tick():
+        nonlocal trajectory_start, trajectory_goal, trajectory_start_time
+        if trajectory_goal is None:  # 정적, 동적 상태 판별
+            return False
+        elapsed = time.perf_counter() - trajectory_start_time
+        t = min(elapsed, trajectory_duration)
+        target_pos = interpolate_position(
+            trajectory_start, trajectory_goal, trajectory_duration, t
+        )
+        apply_ik(robot, robot.state, target_pos, home_poses)
+        if elapsed >= trajectory_duration:
+            trajectory_start = None
+            trajectory_goal = None
+            trajectory_start_time = None
+        return True
 
     # joint/link의 body frame 기준 행렬로 렌더링
     run_ik_target_window(
-        robot, on_target_changed=handle_target_changed
+        robot, on_target_changed=handle_target_changed, on_tick=handle_tick
     )  # callback으로 연결
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import open3d.visualization.gui as gui
 
 
-class IKTargetPanel:
+class TargetPanel:
     def __init__(
         self,
         initial_target,
@@ -19,7 +19,7 @@ class IKTargetPanel:
         self._sliders = []
         self._value_labels = []
 
-        self.widget.add_child(gui.Label("IK target offset"))
+        self.widget.add_child(gui.Label("Right hand pose target"))
         for index, axis_name in enumerate(("dX", "dY", "dZ")):
             self._add_axis_slider(index, axis_name, slider_range)
 
@@ -43,9 +43,9 @@ class IKTargetPanel:
 
     def _set_axis(self, index, value):
         self.offset[index] = float(value)
-        self.target = self.base_target + self.offset
+        self.target = self.base_target + self.offset # ik solver가 받을 하위목표지점 계산
         self._value_labels[index].text = f"{value:.3f}"
-        if self.on_target_changed is not None:
+        if self.on_target_changed is not None: # 움직이면 있으면 callback 함수를 호출
             self.on_target_changed(self.target.copy())
 
     def set_target(self, target, notify=False):

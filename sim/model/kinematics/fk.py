@@ -71,7 +71,7 @@ def compute_fk_all_links_recursive(
             theta = state.get(joint["name"])
             # PoE에서 세타는 기준 자세로부터 joint displacement (각변위)
             # home configuration M 성분이 0이 아니면 목표 관절값에서 M만큼 빼줌
-            if "_qpos" in M:
+            if "_qpos" in M:  # _qpos는 home configuration의 qpos
                 theta -= M["_qpos"][joint["qpos_addr"]]
             S_exp = screw_hat(S) * theta
             cum_T = cum_T @ expm(S_exp)

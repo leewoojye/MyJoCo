@@ -2,10 +2,10 @@ import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
-from sim.view.gui.target_panel import IKTargetPanel
+from sim.view.gui.target_panel import TargetPanel
 
 
-def _link6_position(robot_geometries):
+def target_position(robot_geometries):
     r_hand = robot_geometries.body_node_for("hx5_r_base")
     if r_hand is None:
         raise ValueError("r_hand body node not found")
@@ -16,6 +16,7 @@ def run_ik_target_window(
     robot_geometries,
     initial_target=None,
     on_target_changed=None,
+    on_tick=None,
     slider_range=(-0.5, 0.5),  # end-effector 조작 범위(단위: m)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
 ):
@@ -44,9 +45,9 @@ def run_ik_target_window(
         add_robot_geometries()
         scene.force_redraw()
 
-    def handle_target_changed(target):
+    def handle_target_changed(target_pos):
         if on_target_changed is not None:
-            on_target_changed(target)
+            on_target_changed(target_pos)
         refresh_robot_geometries()
 
     add_robot_geometries()
@@ -54,22 +55,22 @@ def run_ik_target_window(
     axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.25)
     scene.scene.add_geometry("axes", axes, material)
 
-    panel = IKTargetPanel(
+    hand_pose_panel = TargetPanel(
         initial_target
         if initial_target is not None
-        else _link6_position(robot_geometries),
+        else target_position(robot_geometries),
         on_target_changed=handle_target_changed,
         slider_range=slider_range,
     )
 
     window.add_child(scene)
-    window.add_child(panel.widget)
+    window.add_child(hand_pose_panel.widget)
 
     def on_layout(_):
         rect = window.content_rect
         panel_width = min(320, rect.width)
         scene.frame = gui.Rect(rect.x, rect.y, rect.width - panel_width, rect.height)
-        panel.widget.frame = gui.Rect(
+        hand_pose_panel.widget.frame = gui.Rect(
             rect.x + rect.width - panel_width,
             rect.y,
             panel_width,
@@ -77,6 +78,16 @@ def run_ik_target_window(
         )
 
     window.set_on_layout(on_layout)
+
+    def handle_tick():
+        if on_tick is None:
+            return False
+        changed = on_tick() # GUI가 매 프레임마다 자동으로 호출하는 콜백함수 (open3d 제공)
+        if changed:
+            refresh_robot_geometries()
+        return bool(changed)
+
+    window.set_on_tick_event(handle_tick)
 
     bounds = scene.scene.bounding_box
     scene.setup_camera(60.0, bounds, bounds.get_center())
