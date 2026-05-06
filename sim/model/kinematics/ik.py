@@ -55,7 +55,7 @@ def calculate_twist_error(T_sb, T_sd):
 
 
 def solve_newton_raphson_coordinate(
-    robot: RobotGeometries, state: RobotState, target, M
+    robot: RobotGeometries, state: RobotState, target, M, target_body="hx5_r_base"
 ):
     # M: home configuration, 관절각이 0일 때 모든 링크의 T 집합
     # home_qpos = np.zeros(
@@ -70,8 +70,8 @@ def solve_newton_raphson_coordinate(
     while True:
         state.qpos = theta.copy()
         link_poses = compute_fk(robot, state, M)
-        e = target - link_poses["hx5_r_base"][:3, 3]  # (추후 수정)
-        J, joints = compute_position_jacobian(robot, link_poses)
+        e = target - link_poses[target_body][:3, 3]  # (추후 수정)
+        J, joints = compute_position_jacobian(robot, link_poses, target_body)
 
         rows, cols = J.shape
         if rows == cols:  # J is Full rank and square
@@ -95,7 +95,7 @@ def solve_newton_raphson_coordinate(
         # if np.abs(e) <= 1e-4:
         if np.linalg.norm(e) <= 1e-4:
             break
-        if iter > 10:
+        if iter > 100:
             break
 
         iter += 1
@@ -111,9 +111,9 @@ def solve_newton_raphson_coordinate(
 
 
 def solve_newton_raphson_geometric(
-    robot: RobotGeometries, state: RobotState, target, M
+    robot: RobotGeometries, state: RobotState, target, M, target_body="hx5_r_base"
 ):
-    T_sb = robot.body_node_for("hx5_r_base").world_transform
+    T_sb = robot.body_node_for(target_body).world_transform
     T_sd = T_sb.copy()
     T_sd[:3, 3] = target
     # twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
@@ -125,11 +125,11 @@ def solve_newton_raphson_geometric(
     while True:
         state.qpos = theta.copy()
         link_poses = compute_fk(robot, state, M)
-        T_sb = link_poses["hx5_r_base"]
+        T_sb = link_poses[target_body]
         twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
 
         # space frame 기준 자코비안 행렬 J
-        J, joints = compute_geometric_jacobian(robot, link_poses)
+        J, joints = compute_geometric_jacobian(robot, link_poses, target_body)
 
         J_b = (
             Adjoint(np.linalg.inv(T_sb)) @ J
@@ -148,7 +148,7 @@ def solve_newton_raphson_geometric(
 
         if np.linalg.norm(twist_error) <= 1e-4:
             break
-        if iter > 10:
+        if iter > 100:
             break
 
         iter += 1
@@ -163,8 +163,8 @@ def solve_newton_raphson_geometric(
     return state
 
 
-def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M):
-    new_state = solve_newton_raphson_coordinate(robot, state, target, M)
+def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M, target_body="hx5_r_base"):
+    new_state = solve_newton_raphson_coordinate(robot, state, target, M, target_body)
     return new_state
 
 
@@ -175,13 +175,14 @@ def solve_position_ik(robot: RobotGeometries, state: RobotState, target, M):
 
 # position + pose (6D twist) 기반 자코비안 행렬 활용
 # target: input position, (3,)
-def solve_pose_ik(robot: RobotGeometries, state: RobotState, target, M):
-    new_state = solve_newton_raphson_geometric(robot, state, target, M)
+def solve_pose_ik(robot: RobotGeometries, state: RobotState, target, M, target_body="hx5_r_base"):
+    new_state = solve_newton_raphson_geometric(robot, state, target, M, target_body)
 
     return new_state
 
 
 # 계산된 관절각 적용
+# right hand는 geometric ik, left hand는 pose ik 적용
 def apply_ik(robot: RobotGeometries, state: RobotState, target, M):
     # new_state = solve_position_ik(robot, state, target, M)
     new_state = solve_pose_ik(robot, state, target, M)

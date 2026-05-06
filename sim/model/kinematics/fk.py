@@ -64,11 +64,16 @@ def compute_fk_all_links_recursive(
 ):
     if include_node_joints:
         for joint in node.joints:
-            # space frame 기준 관절정보를 가져옴
-            q = joint["world_pos"]
-            w = joint["world_axis"]
+            joint_transform = M[node.name]
+            q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
+            w = joint_transform[:3, :3] @ joint["axis"]
             S = unit_screw_axis(q, w, 0, joint["type"])
-            S_exp = screw_hat(S) * state.get(joint["name"])
+            theta = state.get(joint["name"])
+            # PoE에서 세타는 기준 자세로부터 joint displacement (각변위)
+            # home configuration M 성분이 0이 아니면 목표 관절값에서 M만큼 빼줌
+            if "_qpos" in M:
+                theta -= M["_qpos"][joint["qpos_addr"]]
+            S_exp = screw_hat(S) * theta
             cum_T = cum_T @ expm(S_exp)
 
     all_link_poses[node.name] = cum_T @ M[node.name]

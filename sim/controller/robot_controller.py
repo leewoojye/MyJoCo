@@ -82,6 +82,7 @@ def main():
     # state.set("rh_l1", -0.3)
     # state.set("rh_l2", 0.3)
 
+    # 관절에 대한 자세만 지정함, 관절의 자세가 하위 링크/바디의 자세 결정
     state.set("lift_joint", -0.15)
 
     state.set("head_joint1", 0.0)
@@ -114,6 +115,10 @@ def main():
     state.set("finger_r_joint4", 0.0)
 
     robot = apply_fk(robot, robot.state, home_poses)
+    home_poses = {
+        node.name: node.world_transform.copy() for node in robot.root_body.iter_nodes()
+    }
+    home_poses["_qpos"] = robot.state.qpos.copy()
 
     # 5. 조립된 전체 로봇 화면에 띄우기
     print(f"body nodes: {len(robot.body_nodes)}")

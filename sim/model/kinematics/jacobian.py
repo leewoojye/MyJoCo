@@ -35,9 +35,11 @@ def append_joints(
 
 # omy의 e.e를 position jacobian으로 다루기
 # IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
-def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
+def compute_position_jacobian(
+    robot: RobotGeometries, link_poses=None, target_body="hx5_r_base"
+):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
-    target = robot.body_node_for("hx5_r_base")
+    target = robot.body_node_for(target_body)
     target_transform = (
         link_poses[target.name] if link_poses is not None else target.world_transform
     )
@@ -63,9 +65,12 @@ def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
             joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
         )  # joint_transform[:3, :3] : space-frame transformation(T_sb)
         w = joint_transform[:3, :3] @ joint["axis"]
-        S = unit_screw_axis(q, w, 0, joint["type"])
-        v = S[3:, 0]
-        J_i = np.cross(w, pos_ee) + v  # np.cross(omega, p_ee - q)
+        if joint["type"] == JointType.SLIDE:
+            J_i = w
+        else:
+            S = unit_screw_axis(q, w, 0, joint["type"])
+            v = S[3:, 0]
+            J_i = np.cross(w, pos_ee) + v  # np.cross(omega, p_ee - q)
         all_S.append(J_i.reshape(3, 1))  # 회전 성분을 제외한 열벡터 append
         joints.append(joint)
 
@@ -75,9 +80,11 @@ def compute_position_jacobian(robot: RobotGeometries, link_poses=None):
 
 
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
-def compute_geometric_jacobian(robot: RobotGeometries, link_poses=None):
+def compute_geometric_jacobian(
+    robot: RobotGeometries, link_poses=None, target_body="hx5_r_base"
+):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
-    target = robot.body_node_for("hx5_r_base")
+    target = robot.body_node_for(target_body)
     # parent = target.parent.copy()
     # J = np.zeros(6, target.joints["joint_id"])  # 6xn (n: e.e까지 관절개수) 행렬 초기화
 
