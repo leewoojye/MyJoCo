@@ -3,6 +3,7 @@ import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
 
 from sim.view.gui.target_panel import TargetPanel
+from sim.view.gui.grasp_panel import GraspPanel
 
 
 def target_position(robot_geometries):
@@ -16,6 +17,7 @@ def run_ik_target_window(
     robot_geometries,
     initial_target=None,
     on_target_changed=None,
+    on_grasp_changed=None,
     on_tick=None,
     slider_range=(-0.5, 0.5),  # end-effector 조작 범위(단위: m)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
@@ -50,6 +52,11 @@ def run_ik_target_window(
             on_target_changed(target_pos)
         refresh_robot_geometries()
 
+    def handle_grasp_changed(alpha, isThumb):
+        if on_grasp_changed is not None:
+            on_grasp_changed(alpha, isThumb)
+        refresh_robot_geometries()
+
     add_robot_geometries()
 
     axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.25)
@@ -63,18 +70,32 @@ def run_ik_target_window(
         slider_range=slider_range,
     )
 
+    grasp_pose_panel = GraspPanel(
+        [0.0, 0.0],
+        on_grasp_changed=handle_grasp_changed,
+        slider_range=(0.0, 1.0),
+    )
+
     window.add_child(scene)
     window.add_child(hand_pose_panel.widget)
+    window.add_child(grasp_pose_panel.widget)
 
     def on_layout(_):
         rect = window.content_rect
         panel_width = min(320, rect.width)
+        panel_height = rect.height / 2
         scene.frame = gui.Rect(rect.x, rect.y, rect.width - panel_width, rect.height)
         hand_pose_panel.widget.frame = gui.Rect(
             rect.x + rect.width - panel_width,
             rect.y,
             panel_width,
-            rect.height,
+            panel_height,
+        )
+        grasp_pose_panel.widget.frame = gui.Rect(
+            rect.x + rect.width - panel_width,
+            rect.y + panel_height,
+            panel_width,
+            rect.height - panel_height,
         )
 
     window.set_on_layout(on_layout)
@@ -82,7 +103,9 @@ def run_ik_target_window(
     def handle_tick():
         if on_tick is None:
             return False
-        changed = on_tick() # GUI가 매 프레임마다 자동으로 호출하는 콜백함수 (open3d 제공)
+        changed = (
+            on_tick()
+        )  # GUI가 매 프레임마다 자동으로 호출하는 콜백함수 (open3d 제공)
         if changed:
             refresh_robot_geometries()
         return bool(changed)

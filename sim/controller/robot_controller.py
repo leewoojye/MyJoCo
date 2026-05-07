@@ -4,6 +4,7 @@ import time
 
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
+from sim.model.grasping.form_closure import apply_grasp
 from sim.model.motion.trajectory import interpolate_position
 from sim.model.robot.loader_mujoco import build_robot_geometries
 from sim.model.robot.state import RobotState
@@ -122,42 +123,72 @@ def main():
     }
     home_poses["_qpos"] = robot.state.qpos.copy()
 
+    # 로봇팔 궤적 관련 변수
     trajectory_start = None
     trajectory_goal = None
     trajectory_start_time = None
     trajectory_duration = 1.0  # 단일 궤적 시간 고정
 
+    # 로봇손 관련 변수
+    grasp_alpha = np.zeros(2)
+    isThumb = False
+
+    # panel 클래스에서 배열로 표현된 alpha 중 움직인 alpha만 스칼라로 반환
+    def selected_grasp_alpha():
+        return float(grasp_alpha[0] if isThumb else grasp_alpha[1])
+
     # callback 함수
-    # 패널입력, 시간을 받아 궤적 생성 ->
+    # 패널입력, 시간을 받아 궤적 생성 -> ...
     def handle_target_changed(target_pos):
         nonlocal trajectory_start, trajectory_goal, trajectory_start_time
         trajectory_start = (
             robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
         )
+
         # 타겟패널입력은 새로운 궤적 생성 타이밍에 관여하며, 입력을 감지하면 trajectory 관련 변수를 갱신함
         trajectory_goal = target_pos.copy()
         trajectory_start_time = time.perf_counter()
 
+    def handle_grasp_changed(alpha, isthumb):
+        nonlocal isThumb
+        grasp_alpha[:] = np.asarray(alpha, dtype=float).reshape(2)
+        isThumb = isthumb
+        apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
+
     # 패널 감지 콜백함수가 궤적 생성 시점에 관여한다면, tick(유사 clock) 콜백함수가 로봇의 실제 ik 적용과 렌더링을 맡음
     def handle_tick():
-        nonlocal trajectory_start, trajectory_goal, trajectory_start_time
+        nonlocal \
+            trajectory_start, \
+            trajectory_goal, \
+            trajectory_start_time, \
+            isThumb
+
         if trajectory_goal is None:  # 정적, 동적 상태 판별
             return False
+
         elapsed = time.perf_counter() - trajectory_start_time
         t = min(elapsed, trajectory_duration)
         target_pos = interpolate_position(
             trajectory_start, trajectory_goal, trajectory_duration, t
         )
+
         apply_ik(robot, robot.state, target_pos, home_poses)
+        apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
+
         if elapsed >= trajectory_duration:
             trajectory_start = None
             trajectory_goal = None
             trajectory_start_time = None
+
         return True
 
     # joint/link의 body frame 기준 행렬로 렌더링
+    # e.e pose, grasp, tick 콜백 함수 모두 전달
     run_ik_target_window(
-        robot, on_target_changed=handle_target_changed, on_tick=handle_tick
+        robot,
+        on_target_changed=handle_target_changed,
+        on_grasp_changed=handle_grasp_changed,
+        on_tick=handle_tick,
     )  # callback으로 연결
 
 

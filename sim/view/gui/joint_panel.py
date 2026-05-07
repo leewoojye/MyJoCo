@@ -4,7 +4,7 @@ import numpy as np
 import open3d.visualization.gui as gui
 
 
-class IKTargetPanel:
+class JointPanel:
     def __init__(
         self,
         initial_target,

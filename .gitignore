@@ -1,6 +1,7 @@
 /robotis_mujoco_menagerie/
 /venv/
 /temp/
+/spot/
 /note.md
 /ffw.md
 __pycache__/

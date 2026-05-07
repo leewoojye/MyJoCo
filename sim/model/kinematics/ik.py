@@ -190,8 +190,8 @@ def solve_pose_ik(
 # 계산된 관절각 적용
 # right hand는 geometric ik, left hand는 pose ik 적용
 def apply_ik(robot: RobotGeometries, state: RobotState, target_pos, M):
-    # new_state = solve_position_ik(robot, state, target, M)
-    new_state = solve_pose_ik(robot, state, target_pos, M)
+    new_state = solve_position_ik(robot, state, target_pos, M)
+    # new_state = solve_pose_ik(robot, state, target_pos, M)
     robot = apply_fk(robot, new_state, M)
 
     return robot
