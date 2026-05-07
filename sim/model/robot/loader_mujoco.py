@@ -99,12 +99,21 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
     geom_type = model.geom_type[geom_id]
     mesh_id = None
 
+    # 문제점: gem_type 분기점이 적음
     if geom_type == mujoco.mjtGeom.mjGEOM_MESH:
         mesh_id = int(model.geom_dataid[geom_id])
         geometry = create_open3d_mesh(model, mesh_id)
         geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
     elif geom_type == mujoco.mjtGeom.mjGEOM_PLANE:
         geometry = create_floor_from_mujoco_plane(model, geom_id)
+    elif geom_type == mujoco.mjtGeom.mjGEOM_BOX:
+        size = model.geom_size[geom_id]
+        geometry = o3d.geometry.TriangleMesh.create_box(
+            width=2 * size[0], height=2 * size[1], depth=2 * size[2]
+        )
+        geometry.translate(-size)
+        geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
+        geometry.compute_vertex_normals()
     else:
         return None, None, None
 

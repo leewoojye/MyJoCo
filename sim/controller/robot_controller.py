@@ -63,6 +63,7 @@ def draw_scene(robot_geometries):
 
 def main():
     robot = build_robot_geometries()
+
     # home configuration 저장
     home_poses = {}
     for node in robot.root_body.iter_nodes():
@@ -129,7 +130,7 @@ def main():
     trajectory_start_time = None
     trajectory_duration = 1.0  # 단일 궤적 시간 고정
 
-    # 로봇손 관련 변수
+    # hand grasp 관련 변수
     grasp_alpha = np.zeros(2)
     isThumb = False
 
@@ -178,7 +179,7 @@ def main():
 
         return True
 
-    # joint/link의 body frame 기준 행렬로 렌더링
+    # body frame 기준 joint/link 렌더링
     # e.e pose, grasp, tick 콜백 함수 모두 전달
     run_target_window(
         robot,

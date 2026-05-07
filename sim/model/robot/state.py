@@ -6,7 +6,7 @@ from sim.model.robot.joint import get_mujoco_name, qpos_width_for_joint_type
 
 def initial_qpos_from_keyframe(model, keyframe_name="home"):
     if model.nkey == 0:
-        return np.zeros(model.nq)
+        return model.qpos0.copy()
 
     key_id = 0
     for candidate_id in range(model.nkey):
