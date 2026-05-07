@@ -13,7 +13,7 @@ def target_position(robot_geometries):
     return r_hand.world_transform[:3, 3]
 
 
-def run_ik_target_window(
+def run_target_window(
     robot_geometries,
     initial_target=None,
     on_target_changed=None,
@@ -21,6 +21,7 @@ def run_ik_target_window(
     on_tick=None,
     slider_range=(-0.5, 0.5),  # end-effector 조작 범위(단위: m)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
+    # grasp panel에는 alpha의 범위 (0.0, 1.0)를 전달
 ):
     app = gui.Application.instance
     app.initialize()

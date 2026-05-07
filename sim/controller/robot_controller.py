@@ -8,7 +8,7 @@ from sim.model.grasping.form_closure import apply_grasp
 from sim.model.motion.trajectory import interpolate_position
 from sim.model.robot.loader_mujoco import build_robot_geometries
 from sim.model.robot.state import RobotState
-from sim.view.renderer import run_ik_target_window
+from sim.view.renderer import run_target_window
 
 
 def create_grid(size=4.0, z=0.002, spacing=0.25, color=(0.55, 0.57, 0.60)):
@@ -48,7 +48,7 @@ def draw_scene(robot_geometries):
     ]
 
     vis = o3d.visualization.Visualizer()
-    vis.create_window(window_name="My Simulator - Initial Pose")
+    vis.create_window(window_name="MyJoCo")
     for geometry in scene_geometries:
         vis.add_geometry(geometry)
 
@@ -157,11 +157,7 @@ def main():
 
     # 패널 감지 콜백함수가 궤적 생성 시점에 관여한다면, tick(유사 clock) 콜백함수가 로봇의 실제 ik 적용과 렌더링을 맡음
     def handle_tick():
-        nonlocal \
-            trajectory_start, \
-            trajectory_goal, \
-            trajectory_start_time, \
-            isThumb
+        nonlocal trajectory_start, trajectory_goal, trajectory_start_time, isThumb
 
         if trajectory_goal is None:  # 정적, 동적 상태 판별
             return False
@@ -184,7 +180,7 @@ def main():
 
     # joint/link의 body frame 기준 행렬로 렌더링
     # e.e pose, grasp, tick 콜백 함수 모두 전달
-    run_ik_target_window(
+    run_target_window(
         robot,
         on_target_changed=handle_target_changed,
         on_grasp_changed=handle_grasp_changed,

@@ -23,7 +23,7 @@ class GraspPanel:
         self._sliders = []
         self._value_labels = []
 
-        self.widget.add_child(gui.Label("Right hand pose target"))
+        self.widget.add_child(gui.Label("Right hand grasp target"))
         for index, axis_name in enumerate(("thumb", "finger")):
             self._add_axis_slider(index, axis_name, slider_range)
 
@@ -48,7 +48,7 @@ class GraspPanel:
     def _set_axis(self, index, value):
         self.offset[index] = float(value)
         self.alpha = self.base_alpha + self.offset
-        self.isThumb = index == 0 # 패널에서 첫 인덱스는 thumb을 조종함
+        self.isThumb = index == 0  # 패널에서 첫 인덱스는 thumb을 조종함
         self._value_labels[index].text = f"{value:.3f}"
         if self.on_grasp_changed is not None:  # 움직이면 있으면 callback 함수를 호출
             self.on_grasp_changed(self.alpha.copy(), self.isThumb)

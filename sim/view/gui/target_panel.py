@@ -48,6 +48,8 @@ class TargetPanel:
         if self.on_target_changed is not None: # 움직이면 있으면 callback 함수를 호출
             self.on_target_changed(self.target.copy())
 
+    # 프로그램 내부에서 패널UI의 타겟을 강제로 설정할 때 사용
+    # self-collision solver의 부품으로 사용될 수 있음
     def set_target(self, target, notify=False):
         self.base_target[:] = np.asarray(target, dtype=float).reshape(3)
         self.offset[:] = 0.0
