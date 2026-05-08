@@ -169,7 +169,9 @@ def main():
             trajectory_start, trajectory_goal, trajectory_duration, t
         )
 
+        # 오른손
         apply_ik(robot, robot.state, target_pos, home_poses)
+        # apply_ik(robot, robot.state, target_pos, home_poses)
         apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
 
         if elapsed >= trajectory_duration:

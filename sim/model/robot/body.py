@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class MuJoCoBodyNode:
+class BodyNode:
     def __init__(self, name, body_id=None):
         self.name = name
         self.body_id = body_id

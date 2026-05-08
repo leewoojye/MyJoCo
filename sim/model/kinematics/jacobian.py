@@ -2,7 +2,7 @@ import numpy as np
 from sim.model.math3d.rotation import create_skew
 from sim.model.math3d.screw import unit_screw_axis, screw_hat
 from scipy.linalg import expm
-from sim.model.robot.body import MuJoCoBodyNode
+from sim.model.robot.body import BodyNode
 from sim.model.robot.joint import JointType
 from sim.model.robot.robot_model import RobotGeometries
 from sim.model.robot.state import RobotState
@@ -10,7 +10,7 @@ from sim.model.robot.state import RobotState
 
 def append_joints(
     all_joints,
-    node: MuJoCoBodyNode,
+    node: BodyNode,
     include_nodes=False,
     root_body_name="lift_link",
 ):

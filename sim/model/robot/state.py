@@ -4,6 +4,8 @@ import numpy as np
 from sim.model.robot.joint import get_mujoco_name, qpos_width_for_joint_type
 
 
+# keyframe 속성이 할당된 링크/바디는 keyframe 정보를 초기 qpos로 초기화함
+# keyframe이 없는 free joint는 컨트롤러 측에서 초기 자세를 지정해줌
 def initial_qpos_from_keyframe(model, keyframe_name="home"):
     if model.nkey == 0:
         return model.qpos0.copy()

@@ -2,7 +2,7 @@ import numpy as np
 from sim.model.math3d.rotation import create_skew
 from sim.model.math3d.screw import screw_hat, unit_screw_axis
 from scipy.linalg import expm
-from sim.model.robot.body import MuJoCoBodyNode
+from sim.model.robot.body import BodyNode
 from sim.model.robot.joint import JointType
 from sim.model.robot.robot_model import RobotGeometries
 from sim.model.robot.state import RobotState
@@ -55,7 +55,7 @@ from sim.model.robot.state import RobotState
 
 # root body에서 시작해 재귀적으로 transform matrix 계산
 def compute_fk_all_links_recursive(
-    node: MuJoCoBodyNode,
+    node: BodyNode,
     state: RobotState,
     M,
     cum_T,

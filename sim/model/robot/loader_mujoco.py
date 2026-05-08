@@ -5,7 +5,7 @@ import mujoco
 import numpy as np
 import open3d as o3d
 
-from sim.model.robot.body import MuJoCoBodyNode
+from sim.model.robot.body import BodyNode
 from sim.model.robot.geometry import EndEffector, GeometryRecord, make_transform
 from sim.model.robot.joint import create_joint_record, get_mujoco_name
 from sim.model.robot.robot_model import RobotGeometries
@@ -100,7 +100,9 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
     mesh_id = None
 
     # 문제점: gem_type 분기점이 적음
-    if geom_type == mujoco.mjtGeom.mjGEOM_MESH:
+    # mjtGeom: MuJoCo가 정의한 기하 타입을 모아놓은 열거형
+    # mjGEOM_MESH: 열거형 상수(고유한 정수)
+    if geom_type == mujoco.mjtGeom.mjGEOM_MESH:  # ex. arm, finger link
         mesh_id = int(model.geom_dataid[geom_id])
         geometry = create_open3d_mesh(model, mesh_id)
         geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
@@ -114,6 +116,20 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
         geometry.translate(-size)
         geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
         geometry.compute_vertex_normals()
+    elif geom_type == mujoco.mjtGeom.mjGEOM_CYLINDER:
+        radius = model.geom_size[geom_id][0]
+        half_height = model.geom_size[geom_id][1]
+        geometry = o3d.geometry.TriangleMesh.create_cylinder(
+            radius=radius,
+            height=2 * half_height,
+            resolution=32,
+        )
+        geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
+        geometry.compute_vertex_normals()
+    elif geom_type == mujoco.mjtGeom.mjGEOM_SPHERE:
+        return None, None, None
+    elif geom_type == mujoco.mjtGeom.mjGEOM_CAPSULE:
+        return None, None, None
     else:
         return None, None, None
 
@@ -126,7 +142,7 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
 
 
 def build_body_nodes(model, data):
-    body_nodes: Dict[int, MuJoCoBodyNode] = {}
+    body_nodes: Dict[int, BodyNode] = {}
 
     for body_id in range(model.nbody):
         body_name = get_mujoco_name(
@@ -135,7 +151,7 @@ def build_body_nodes(model, data):
             body_id,
             f"body_{body_id}",
         )
-        node = MuJoCoBodyNode(body_name, body_id)
+        node = BodyNode(body_name, body_id)
         node.mass = float(model.body_mass[body_id])
         node.inertia = model.body_inertia[body_id].copy()
         node.local_transform = make_transform(
@@ -183,7 +199,9 @@ def build_body_nodes(model, data):
 
 def build_robot_geometries(xml_path=XML_PATH):
     # 1. MuJoCo로 XML 파싱 및 초기 구조 불러오기
+    # XML 파일을 읽어와 MjModel 객체를 생성
     model = mujoco.MjModel.from_xml_path(str(xml_path))
+    # MjModel과 달리 동적인 현재 상태를 담는 객체로, qpos, qvel 등 정보를 담음
     data = mujoco.MjData(model)
     state = RobotState.from_model(model)
     data.qpos[:] = state.qpos
