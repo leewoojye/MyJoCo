@@ -6,10 +6,10 @@ import numpy as np
 import open3d as o3d
 
 from sim.model.robot.body import BodyNode
-from sim.model.robot.geometry import EndEffector, GeometryRecord, make_transform
+from sim.model.robot.geometry import EndEffector, GeomRecord, make_transform
 from sim.model.robot.joint import create_joint_record, get_mujoco_name
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "scene_ffw_sh5.xml"
@@ -206,19 +206,17 @@ def build_robot_geometries(xml_path=XML_PATH):
     state = RobotState.from_model(model)
     data.qpos[:] = state.qpos
 
-    # 초기 상태의 절대 좌표계를 한 번 계산합니다.
+    # 초기 상태의 절대 좌표계를 한 번 계산
     mujoco.mj_kinematics(model, data)
 
     body_nodes, root_body = build_body_nodes(model, data)
-    records = []
-    records_by_body_id = {}
     ee_body_ids = set()
     for body_name in END_EFFECTOR_BODIES.values():
         body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
         if body_id != -1:
             ee_body_ids.add(body_id)
 
-    # 2. 로봇의 모든 기하학적 형태(geom)를 순회합니다.
+    # 로봇의 모든 geom을 순회
     for i in range(model.ngeom):
         geometry, T, mesh_id = create_open3d_geometry_from_geom(model, data, i)
         if geometry is None:
@@ -230,7 +228,7 @@ def build_robot_geometries(xml_path=XML_PATH):
         if mesh_id is not None:
             mesh_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, mesh_id)
 
-        record = GeometryRecord(
+        record = GeomRecord(
             mesh=geometry,
             geom_id=i,
             geom_name=mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i),
@@ -242,12 +240,13 @@ def build_robot_geometries(xml_path=XML_PATH):
             transform=T.copy(),
             is_end_effector=body_id in ee_body_ids,
         )
-        records.append(record)
-        records_by_body_id.setdefault(body_id, []).append(record)
-
         body_node = body_nodes[body_id]
-        body_node.geometries.append(geometry)
-        body_node.geometry_records.append(record)
+        # display용 geom은 관례적으로 geom_group를 2로 할당함
+        if model.geom_group[i] == 2:
+            body_node.visual_records.append(record)
+        # 어떤 충돌 타입에 관여하는지 나타내는 geom_contype, geom_conaffinity 필드로 collision records 배열을 구성
+        if model.geom_contype[i] != 0 or model.geom_conaffinity[i] != 0:
+            body_node.collision_records.append(record)
 
     end_effectors = {}
     for ee_name, body_name in END_EFFECTOR_BODIES.items():
@@ -264,9 +263,7 @@ def build_robot_geometries(xml_path=XML_PATH):
             position=pos,
             rotation=rot,
             transform=make_transform(pos, rot),
-            geometry_records=records_by_body_id.get(body_id, []),
+            geom_records=list(body_nodes[body_id].records()),
         )
 
-    return RobotGeometries(
-        model, data, state, body_nodes, root_body, records, end_effectors
-    )
+    return RobotModel(model, data, state, body_nodes, root_body, end_effectors)

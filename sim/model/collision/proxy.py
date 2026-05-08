@@ -5,16 +5,36 @@ import open3d as o3d
 from open3d import geometry, utility, visualization
 
 
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.body import BodyNode
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 
 
 # open3d 기본 mesh를 cylinder mesh로 변환
-def make_cylinder_proxy(robot: RobotGeometries, state: RobotState, mesh):
+# 로봇팔, 손가락 proxy
+def make_cylinder_proxy(robot: RobotModel, state: RobotState, node: BodyNode):
+    mesh = node.collision_records
     bbox = mesh.get_oriented_bounding_box()
-    axises = np.asarray(bbox.extent)
+    axis_length_list = np.asarray(bbox.extent)
+    axis_max_length = max(
+        axis_length_list[0], max(axis_length_list[1], axis_length_list[2])
+    )
+    radius = (
+        sum(
+            axis_length_list[i]
+            for i in range(3)
+            if axis_length_list[i] != axis_max_length
+        )
+        / 2
+    )
+    cylinder = o3d.geometry.TriangleMesh.create_cylinder(
+        radius=radius,
+        height=axis_max_length,
+        resolution=32,
+    )
+    # cylinder_position=state.
     return
 
 
-def make_capsule_proxy(robot: RobotGeometries, state: RobotState):
+def make_capsule_proxy(robot: RobotModel, state: RobotState):
     return

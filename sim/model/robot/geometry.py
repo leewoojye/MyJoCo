@@ -13,8 +13,10 @@ def make_transform(position, rotation_matrix):
 
 
 @dataclass
-class GeometryRecord:
+class GeomRecord:
+    # open3d로 표현된 mesh (실제 렌더링에 사용)
     mesh: o3d.geometry.TriangleMesh
+    # 정적인 메타데이터 필드 (MJCF metadata)
     geom_id: int
     geom_name: Optional[str]
     body_id: int
@@ -22,6 +24,7 @@ class GeometryRecord:
     geom_type: str
     mesh_id: Optional[int]
     mesh_name: Optional[str]
+    # 동적인 메타데이터 필드ㄷ (현재 open3d mesh의 위치)
     transform: np.ndarray
     is_end_effector: bool = False
 
@@ -34,4 +37,4 @@ class EndEffector:
     position: np.ndarray
     rotation: np.ndarray
     transform: np.ndarray
-    geometry_records: List[GeometryRecord]
+    geom_records: List[GeomRecord]

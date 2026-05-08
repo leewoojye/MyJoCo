@@ -6,8 +6,8 @@ from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
 from sim.model.grasping.form_closure import apply_grasp
 from sim.model.motion.trajectory import interpolate_position
-from sim.model.robot.loader_mujoco import build_robot_geometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.loader_with_mujoco import build_robot_geometries
+from sim.model.robot.robot_state import RobotState
 from sim.view.renderer import run_target_window
 
 

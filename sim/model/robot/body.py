@@ -13,8 +13,8 @@ class BodyNode:
         self.attributes = {}
 
         # 2. Open3D 시각화 객체 영역
-        self.geometries = []
-        self.geometry_records = []
+        self.visual_records = []
+        self.collision_records = []
 
         # 3. 계층 구조 보존 영역 (Kinematic Tree)
         self.parent = None
@@ -33,8 +33,12 @@ class BodyNode:
         for child in self.children:
             yield from child.iter_nodes()
 
+    # visual/collision record가 합쳐진 레코드를 반환 (중복 허용)
+    def records(self):
+        return self.visual_records + self.collision_records
+
     def all_geometries(self):
-        geometries = list(self.geometries)
+        geometries = [record.mesh for record in self.records()]
         for child in self.children:
             geometries.extend(child.all_geometries())
         return geometries

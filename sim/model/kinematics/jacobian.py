@@ -4,8 +4,8 @@ from sim.model.math3d.screw import unit_screw_axis, screw_hat
 from scipy.linalg import expm
 from sim.model.robot.body import BodyNode
 from sim.model.robot.joint import JointType
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 
 
 def append_joints(
@@ -36,7 +36,7 @@ def append_joints(
 # omy의 e.e를 position jacobian으로 다루기
 # IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
 def compute_position_jacobian(
-    robot: RobotGeometries, link_poses=None, target_body="hx5_r_base"
+    robot: RobotModel, link_poses=None, target_body="hx5_r_base"
 ):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)
@@ -81,7 +81,7 @@ def compute_position_jacobian(
 
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
 def compute_geometric_jacobian(
-    robot: RobotGeometries, link_poses=None, target_body="hx5_r_base"
+    robot: RobotModel, link_poses=None, target_body="hx5_r_base"
 ):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)

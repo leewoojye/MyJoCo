@@ -4,8 +4,8 @@ from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
 from sim.model.math3d.rotation import omega2rotation_matrix
 from sim.model.math3d.transform import create_transform_matrix
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 from sim.model.math3d.lie import Adjoint
 from sim.model.kinematics.jacobian import (
     compute_position_jacobian,
@@ -13,7 +13,7 @@ from sim.model.kinematics.jacobian import (
 )
 
 
-def calculate_grasp(robot: RobotGeometries, state: RobotState, alpha, isThumb):
+def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
     # q = (1 - grasp) q_open + grasp q_closed
     q_open = 0
 
@@ -40,7 +40,7 @@ def calculate_grasp(robot: RobotGeometries, state: RobotState, alpha, isThumb):
     return state
 
 
-def apply_grasp(robot: RobotGeometries, state: RobotState, M, alpha, isThumb=False):
+def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, isThumb=False):
     state = calculate_grasp(robot, state, alpha, isThumb)
     robot = apply_fk(robot, state, M)
 

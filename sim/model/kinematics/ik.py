@@ -6,8 +6,8 @@ from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
 from sim.model.math3d.rotation import omega2rotation_matrix
 from sim.model.math3d.transform import create_transform_matrix
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 from sim.model.math3d.lie import Adjoint
 from sim.model.kinematics.jacobian import (
     compute_position_jacobian,
@@ -55,7 +55,7 @@ def calculate_twist_error(T_sb, T_sd):
 
 
 def solve_newton_raphson_coordinate(
-    robot: RobotGeometries, state: RobotState, target_pos, M, target_body="hx5_r_base"
+    robot: RobotModel, state: RobotState, target_pos, M, target_body="hx5_r_base"
 ):
     # M: home configuration, 관절각이 0일 때 모든 링크의 T 집합
     # home_qpos = np.zeros(
@@ -111,7 +111,7 @@ def solve_newton_raphson_coordinate(
 
 
 def solve_newton_raphson_geometric(
-    robot: RobotGeometries, state: RobotState, target_pos, M, target_body="hx5_r_base"
+    robot: RobotModel, state: RobotState, target_pos, M, target_body="hx5_r_base"
 ):
     T_sb = robot.body_node_for(target_body).world_transform
     T_sd = T_sb.copy()
@@ -164,7 +164,7 @@ def solve_newton_raphson_geometric(
 
 
 def solve_position_ik(
-    robot: RobotGeometries, state: RobotState, target_pos, M, target_body="hx5_r_base"
+    robot: RobotModel, state: RobotState, target_pos, M, target_body="hx5_r_base"
 ):
     new_state = solve_newton_raphson_coordinate(
         robot, state, target_pos, M, target_body
@@ -180,7 +180,7 @@ def solve_position_ik(
 # position + pose (6D twist) 기반 자코비안 행렬 활용
 # target_pos(3,): input position
 def solve_pose_ik(
-    robot: RobotGeometries, state: RobotState, target_pos, M, target_body="hx5_r_base"
+    robot: RobotModel, state: RobotState, target_pos, M, target_body="hx5_r_base"
 ):
     new_state = solve_newton_raphson_geometric(robot, state, target_pos, M, target_body)
 
@@ -189,7 +189,7 @@ def solve_pose_ik(
 
 # 계산된 관절각 적용
 # right hand는 geometric ik, left hand는 pose ik 적용
-def apply_ik(robot: RobotGeometries, state: RobotState, target_pos, M):
+def apply_ik(robot: RobotModel, state: RobotState, target_pos, M):
     new_state = solve_position_ik(robot, state, target_pos, M)
     # new_state = solve_pose_ik(robot, state, target_pos, M)
     robot = apply_fk(robot, new_state, M)

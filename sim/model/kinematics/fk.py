@@ -4,8 +4,8 @@ from sim.model.math3d.screw import screw_hat, unit_screw_axis
 from scipy.linalg import expm
 from sim.model.robot.body import BodyNode
 from sim.model.robot.joint import JointType
-from sim.model.robot.robot_model import RobotGeometries
-from sim.model.robot.state import RobotState
+from sim.model.robot.robot_model import RobotModel
+from sim.model.robot.robot_state import RobotState
 
 # PoE: product of exponential
 # 관절각 집합: state.qpos
@@ -84,7 +84,7 @@ def compute_fk_all_links_recursive(
 
 
 # 주어진 state를 입력으로 end-effector의 위치를 계산만하여 반환
-def compute_fk(robot: RobotGeometries, state: RobotState, M):
+def compute_fk(robot: RobotModel, state: RobotState, M):
     # all_link_poses를 전역변수로 선언하면 compute_fk를 동시에 호출할 때 문제가 됨
     all_link_poses = {}
     T = np.eye(4)
@@ -96,7 +96,7 @@ def compute_fk(robot: RobotGeometries, state: RobotState, M):
 
 
 # FK를 재귀적으로 계산한 후, 노드 및 mesh의 transform matrix가 업데이트된 RobotGeometries 인스턴스 반환
-def apply_fk(robot: RobotGeometries, state: RobotState, M):
+def apply_fk(robot: RobotModel, state: RobotState, M):
     all_link_poses = {}
     T = np.eye(4)
     root_node = robot.body_node_for("lift_link") or robot.root_body
@@ -113,8 +113,8 @@ def apply_fk(robot: RobotGeometries, state: RobotState, M):
         # new_T = delta @ old_T, delta는 space frame 기준 보정 행렬
         delta = new_T @ np.linalg.inv(old_T)
 
-        for mesh in node.geometries:
-            mesh.transform(delta)
+        for record in node.records():
+            record.mesh.transform(delta)
 
         node.world_transform = new_T
 
