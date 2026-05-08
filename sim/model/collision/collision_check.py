@@ -66,3 +66,17 @@ def collision_check(robot: RobotModel, state: RobotState, M):
             return True
 
     return False
+
+
+# def contact_pairs():
+#     return
+
+
+def contact_mode():
+    return
+
+
+# 접촉점 후보 생성
+# 접촉 상태 평가는 grasping/...closure.py에서 수행
+def search_contact_candidates():
+    return

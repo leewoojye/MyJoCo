@@ -13,6 +13,10 @@ from sim.model.kinematics.jacobian import (
 )
 
 
+def check_form_closure():
+    return
+
+
 def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
     # q = (1 - grasp) q_open + grasp q_closed
     q_open = 0

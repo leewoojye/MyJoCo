@@ -13,4 +13,5 @@ def proxy_distance(r1: GeomRecord, r2: GeomRecord):
 
     d12 = pcd1.compute_point_cloud_distance(pcd2)
     d21 = pcd2.compute_point_cloud_distance(pcd1)
+
     return min(min(d12), min(d21))
