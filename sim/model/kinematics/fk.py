@@ -113,7 +113,7 @@ def apply_fk(robot: RobotModel, state: RobotState, M):
         # new_T = delta @ old_T, delta는 space frame 기준 보정 행렬
         delta = new_T @ np.linalg.inv(old_T)
 
-        for record in node.records():
+        for record in node.all_records():
             record.mesh.transform(delta)
 
         node.world_transform = new_T

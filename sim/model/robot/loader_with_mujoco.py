@@ -135,8 +135,8 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
         return None, None, None
 
     transform = create_transform_matrix(
-        data.geom_xpos[geom_id],
         data.geom_xmat[geom_id].reshape(3, 3),
+        data.geom_xpos[geom_id],
     )
     geometry.transform(transform)
     return geometry, transform, mesh_id
@@ -156,12 +156,12 @@ def build_body_nodes(model, data):
         node.mass = float(model.body_mass[body_id])
         node.inertia = model.body_inertia[body_id].copy()
         node.local_transform = create_transform_matrix(
-            model.body_pos[body_id],
             quat_to_matrix(model.body_quat[body_id]),
+            model.body_pos[body_id],
         )
         node.world_transform = create_transform_matrix(
-            data.xpos[body_id],
             data.xmat[body_id].reshape(3, 3),
+            data.xpos[body_id],
         )
         node.attributes = {
             "body_id": body_id,
@@ -263,7 +263,7 @@ def build_robot_geometries(xml_path=XML_PATH):
             body_id=body_id,
             position=pos,
             rotation=rot,
-            transform=create_transform_matrix(pos, rot),
+            transform=create_transform_matrix(rot, pos),
             geom_records=list(body_nodes[body_id].all_records()),
         )
 

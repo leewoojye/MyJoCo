@@ -4,7 +4,7 @@ class RobotModel(list):
         self.model = model
         self.data = data
         self.state = state
-        self.body_nodes = body_nodes
+        self.body_nodes = body_nodes # 전체 노드
         self.root_body = root_body
         self.end_effectors = end_effectors
 
