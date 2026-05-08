@@ -6,17 +6,19 @@ class BodyNode:
         self.name = name
         self.body_id = body_id
 
-        # 1. MuJoCo XML 정보 보존 영역
+        # 기존 MJCF 정보
         self.mass = 0.0
         self.inertia = []
         self.joints = []
         self.attributes = {}
 
-        # 2. Open3D 시각화 객체 영역
+        # open3d 시각화 대상 record 배열
+        # record: open3d mesh, metadata를 묶은 wrapper 객체
         self.visual_records = []
+        # open3d 충돌 감지 고려 대상 record 배열
         self.collision_records = []
 
-        # 3. 계층 구조 보존 영역 (Kinematic Tree)
+        # kinematic tree
         self.parent = None
         self.children = []
 
@@ -34,11 +36,11 @@ class BodyNode:
             yield from child.iter_nodes()
 
     # visual/collision record가 합쳐진 레코드를 반환 (중복 허용)
-    def records(self):
+    def all_records(self):
         return self.visual_records + self.collision_records
 
     def all_geometries(self):
-        geometries = [record.mesh for record in self.records()]
+        geometries = [record.mesh for record in self.all_records()]
         for child in self.children:
             geometries.extend(child.all_geometries())
         return geometries

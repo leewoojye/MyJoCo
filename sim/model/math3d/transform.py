@@ -1,7 +1,7 @@
+# 고려사항:
+# # 객체로 표현된 rotation, transform matrix
 import numpy as np
 
-
-# 객체로 표현된 rotation, transform matrix도 고려
 
 # 4x4 skew-symmetric matrix 생성
 def create_skew(vector):

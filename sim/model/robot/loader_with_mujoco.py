@@ -5,8 +5,9 @@ import mujoco
 import numpy as np
 import open3d as o3d
 
+from sim.model.math3d.transform import create_transform_matrix
 from sim.model.robot.body import BodyNode
-from sim.model.robot.geometry import EndEffector, GeomRecord, make_transform
+from sim.model.robot.geometry import EndEffector, GeomRecord
 from sim.model.robot.joint import create_joint_record, get_mujoco_name
 from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
@@ -17,16 +18,16 @@ XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "scene_ffw_sh
 END_EFFECTOR_BODIES = {
     "left_hand": "hx5_l_base",
     "right_hand": "hx5_r_base",
-    "left_thumb_tip": "finger_l_link4",
-    "left_index_tip": "finger_l_link8",
-    "left_middle_tip": "finger_l_link12",
-    "left_ring_tip": "finger_l_link16",
-    "left_little_tip": "finger_l_link20",
-    "right_thumb_tip": "finger_r_link4",
-    "right_index_tip": "finger_r_link8",
-    "right_middle_tip": "finger_r_link12",
-    "right_ring_tip": "finger_r_link16",
-    "right_little_tip": "finger_r_link20",
+    # "left_thumb_tip": "finger_l_link4",
+    # "left_index_tip": "finger_l_link8",
+    # "left_middle_tip": "finger_l_link12",
+    # "left_ring_tip": "finger_l_link16",
+    # "left_little_tip": "finger_l_link20",
+    # "right_thumb_tip": "finger_r_link4",
+    # "right_index_tip": "finger_r_link8",
+    # "right_middle_tip": "finger_r_link12",
+    # "right_ring_tip": "finger_r_link16",
+    # "right_little_tip": "finger_r_link20",
 }
 
 
@@ -133,7 +134,7 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
     else:
         return None, None, None
 
-    transform = make_transform(
+    transform = create_transform_matrix(
         data.geom_xpos[geom_id],
         data.geom_xmat[geom_id].reshape(3, 3),
     )
@@ -154,11 +155,11 @@ def build_body_nodes(model, data):
         node = BodyNode(body_name, body_id)
         node.mass = float(model.body_mass[body_id])
         node.inertia = model.body_inertia[body_id].copy()
-        node.local_transform = make_transform(
+        node.local_transform = create_transform_matrix(
             model.body_pos[body_id],
             quat_to_matrix(model.body_quat[body_id]),
         )
-        node.world_transform = make_transform(
+        node.world_transform = create_transform_matrix(
             data.xpos[body_id],
             data.xmat[body_id].reshape(3, 3),
         )
@@ -262,8 +263,8 @@ def build_robot_geometries(xml_path=XML_PATH):
             body_id=body_id,
             position=pos,
             rotation=rot,
-            transform=make_transform(pos, rot),
-            geom_records=list(body_nodes[body_id].records()),
+            transform=create_transform_matrix(pos, rot),
+            geom_records=list(body_nodes[body_id].all_records()),
         )
 
     return RobotModel(model, data, state, body_nodes, root_body, end_effectors)

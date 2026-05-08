@@ -5,13 +5,6 @@ import numpy as np
 import open3d as o3d
 
 
-def make_transform(position, rotation_matrix):
-    T = np.eye(4)
-    T[:3, :3] = rotation_matrix
-    T[:3, 3] = position
-    return T
-
-
 @dataclass
 class GeomRecord:
     # open3d로 표현된 mesh (실제 렌더링에 사용)
