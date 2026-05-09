@@ -1,6 +1,7 @@
 import numpy as np
 
 
+# MJCF에서 body tag가 붙은 원소는 BodyNode 인스턴스 생성
 class BodyNode:
     def __init__(self, name, body_id=None):
         self.name = name

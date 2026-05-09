@@ -4,6 +4,7 @@ import numpy as np
 import scipy
 from typing import Tuple
 from sim.model.collision.distance import proxy_distance
+from sim.model.grasping.contact import ContactPoint
 from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.kinematics.ik import apply_ik
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
@@ -33,21 +34,22 @@ def is_adjacent(robot: RobotModel, body_id1, body_id2):
     return node1.parent is node2 or node2.parent is node1
 
 
+# 가능한 접촉/충돌 후보 쌍들을 반환
 def collision_pairs(robot: RobotModel):
     records = collect_collision_records(robot)
 
     for i in range(len(records)):
-        for j in range(i + 1, len(records)):
-            r1 = records[i]
-            r2 = records[j]
+        for j in range(i + 1, len(records)):  # pair 중복 처리 효과
+            r_a = records[i]
+            r_b = records[j]
 
-            if r1.body_id == r2.body_id:
+            if r_a.body_id == r_b.body_id:
                 continue
 
-            if is_adjacent(robot, r1.body_id, r2.body_id):  # 이웃한 링크들은 충돌 후보에서 제외
+            if is_adjacent(robot, r_a.body_id, r_b.body_id):  # 이웃한 링크들은 충돌 후보에서 제외
                 continue
 
-            yield r1, r2  # 제너레이터 함수
+            yield r_a, r_b  # 제너레이터 함수
 
 
 # 후보 state에서 충돌이나 접촉이 일어나는지 판단하는 함수
@@ -61,25 +63,38 @@ def collision_check(
     candidate_qpos = state.qpos.copy()
     apply_fk(robot, state, M)
 
-    for r1, r2 in collision_pairs(robot):
-        d = proxy_distance(r1, r2)
+    for r_a, r_b in collision_pairs(robot):  # collision_pairs에서 중복 처리된 pair를 가져옴
+        p_a, p_b, d = proxy_distance(r_a, r_b)
+
         if d <= 0.005:  # if d <= 0.0: # collision detection
             state.qpos[:] = candidate_qpos
             robot.state.qpos[:] = old_qpos
             apply_fk(robot, robot.state, M)  # 이전 상태(robot.state)로 rollback
+
             return True, False, None
+
         elif 0.005 < d <= 0.01:  # contact detection
             is_contact = True  # 충돌과 접촉이 공존할 수 있기에 충돌 감지를 먼저 모두 거치고 접촉 여부를 반환하게 함
+
             if return_contacts:
-                contact_candidates.append((r1, r2))
+                contact_candidates.append(
+                    ContactPoint(
+                        record_a=r_a,
+                        record_b=r_b,
+                        point=0.5 * (p_a + p_b),
+                        point_a=p_a,
+                        point_b=p_b,
+                        normal=contact_normal(p_a, p_b),
+                        distance=d,
+                    )
+                )
 
     if is_contact:
-        unique_candidates = set(contact_candidates)
         state.qpos[:] = candidate_qpos
         robot.state.qpos[:] = old_qpos
         apply_fk(robot, robot.state, M)
 
-        return True, True, unique_candidates
+        return True, True, contact_candidates
 
     # 이전 상태(robot.state)로 rollback
     state.qpos[:] = candidate_qpos
@@ -89,20 +104,24 @@ def collision_check(
     return False, False, None
 
 
-# def contact_pairs():
-#     return
+# a->b 방향 법선 단위 벡터
+def contact_normal(point_a, point_b):
+    normal = point_b - point_a
+    norm = np.linalg.norm(normal)
 
+    if norm < 1e-8:  # 크기가 0으로 수렴하는 법선벡터 처리
+        return None
 
-def contact_normal():
-    return
+    return normal / norm
 
 
 # collision_check()로부터 후보 접촉점 배열을 받아 ContactPoint 배열을 생성
 # 접촉점에서의 위치와 힘
 def build_contact_candidates(robot: RobotModel, state: RobotState, M):
     is_collision, is_contact, contact_candidates = collision_check(robot, state, M, True)
+    contactpoint_list = []
     if is_collision or not is_contact:
         return None
-    # 접촉점 개수가 7개 이상이 되는지 나타내는 flag 변수도 반환 (3차원 공간 기준)
-    # 이는 form closure 평가에서 wrench 벡터들로 positive span을 만들 때 이용
-    return
+
+    # 접촉점 개수가 7개 이상이 되는지 나타내는 flag 변수도 반환 (3차원 공간 기준) -> 이건 호출부에서 처리하는게 나을듯
+    return contactpoint_list

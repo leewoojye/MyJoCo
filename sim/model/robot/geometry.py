@@ -5,6 +5,8 @@ import numpy as np
 import open3d as o3d
 
 
+# MJCF의 geom tag 내용 + 관련 open3d metadata로 구성
+# geom은 실체 형상인 mesh 정보를 담고 있음
 @dataclass
 class GeomRecord:
     # open3d로 표현된 mesh (실제 렌더링에 사용)

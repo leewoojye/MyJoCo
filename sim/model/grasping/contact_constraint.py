@@ -1,32 +1,14 @@
-from enum import Enum  # 상수를 묶는 용도
 import numpy as np
 from scipy.optimize import linprog
 import math
 
 from sim.model.collision.collision_check import build_contact_candidates
+from sim.model.grasping.contact import ContactPoint, ContactType
 from sim.model.math3d.rotation import create_skew
 from spots.utils.util import skew
 
 
-class ContactType(Enum):
-    B = "breaking_free"
-    S = "sliding"
-    R = "rolling"  # rolling/sticking
-
-
-# 접촉점 클래스
-class ContactPoint:
-    # 디폴트 접촉 모드: B(breaking-free)
-    # contact_type = ContactType.B
-
-    def __init__(self, pos, force, V_a, V_b, p_a, p_b):
-        self.pos = pos
-        self.force = force
-        self.wrench = force_to_wrench(pos, force)
-        self.contact_type = contact_type(V_a, V_b, p_a, p_b)
-
-
-# contact type 설정
+# contact type(mode) 설정
 def contact_type(V_a, V_b, p_a, p_b):  # 트위스트 V, 위치 p 모두 space frame
     w_a = V_a[:3, 0]
     w_b = V_b[:3, 0]
