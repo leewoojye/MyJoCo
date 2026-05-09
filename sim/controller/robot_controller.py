@@ -2,6 +2,7 @@ import numpy as np
 import open3d as o3d
 import time
 
+from sim.model.collision import collision_check
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
 from sim.model.grasping.form_closure import apply_grasp
@@ -119,9 +120,7 @@ def main():
     state.set("finger_r_joint4", 0.0)
 
     robot = apply_fk(robot, robot.state, home_poses)
-    home_poses = {
-        node.name: node.world_transform.copy() for node in robot.root_body.iter_nodes()
-    }
+    home_poses = {node.name: node.world_transform.copy() for node in robot.root_body.iter_nodes()}
     home_poses["_qpos"] = robot.state.qpos.copy()
 
     # 로봇팔 궤적 관련 변수
@@ -142,9 +141,7 @@ def main():
     # 패널입력, 시간을 받아 궤적 생성 -> ...
     def handle_target_changed(target_pos):
         nonlocal trajectory_start, trajectory_goal, trajectory_start_time
-        trajectory_start = (
-            robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
-        )
+        trajectory_start = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
 
         # 타겟패널입력은 새로운 궤적 생성 타이밍에 관여하며, 입력을 감지하면 trajectory 관련 변수를 갱신함
         trajectory_goal = target_pos.copy()
@@ -165,13 +162,45 @@ def main():
 
         elapsed = time.perf_counter() - trajectory_start_time
         t = min(elapsed, trajectory_duration)
-        target_pos = interpolate_position(
-            trajectory_start, trajectory_goal, trajectory_duration, t
+        target_pos = interpolate_position(trajectory_start, trajectory_goal, trajectory_duration, t)
+
+        # 오른손에 pose IK 적용
+        # apply_ik(robot, robot.state, target_pos, home_poses, "pose")
+        # # 왼손은 position IK 적용
+        # # apply_ik(robot, robot.state, target_pos, home_poses, "position")
+        # # 오른손 손가락
+        # apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
+
+        candidate_state = RobotState(
+            robot.state.joint_names,
+            robot.state.qpos_addrs,
+            robot.state.qpos_widths,
+            robot.state.qpos.copy(),
         )
 
-        # 오른손
-        apply_ik(robot, robot.state, target_pos, home_poses)
-        # apply_ik(robot, robot.state, target_pos, home_poses)
+        apply_ik(robot, candidate_state, target_pos, home_poses, "pose")
+
+        is_collision, is_contact, contacts = collision_check(
+            robot,
+            candidate_state,
+            home_poses,
+            return_contacts=True,
+        )
+
+        if is_collision:
+            trajectory_goal = None
+            trajectory_start = None
+            trajectory_start_time = None
+            return False
+
+        robot.state.qpos[:] = candidate_state.qpos
+
+        # 오른손에 FK 적용
+        apply_fk(robot, robot.state, home_poses)
+
+        # 왼손은 position IK -> FK (closed-chain...)
+
+        # 오른손 손가락
         apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
 
         if elapsed >= trajectory_duration:

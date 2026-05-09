@@ -1,5 +1,3 @@
-from tkinter.tix import Tree
-
 import numpy as np
 import scipy
 from typing import Tuple
@@ -61,9 +59,17 @@ def collision_check(
     contact_candidates = []
     old_qpos = robot.state.qpos.copy()
     candidate_qpos = state.qpos.copy()
+    ignored_pairs = { # 캔-테이블, 테이블-바닥, 바닥-캔 사이 접점은 충돌 감지 대상에서 배제하기 위함
+        frozenset({"world", "pr_cokeCan"}),
+        frozenset({"base_table", "pr_cokeCan"}),
+        frozenset({"world", "base_table"}),
+    }
     apply_fk(robot, state, M)
 
     for r_a, r_b in collision_pairs(robot):  # collision_pairs에서 중복 처리된 pair를 가져옴
+        if frozenset({r_a.body_name, r_b.body_name}) in ignored_pairs:
+            continue
+
         p_a, p_b, d = proxy_distance(r_a, r_b)
 
         if d <= 0.005:  # if d <= 0.0: # collision detection
