@@ -1,3 +1,5 @@
+from tkinter.tix import Tree
+
 import numpy as np
 import scipy
 from typing import Tuple
@@ -49,22 +51,42 @@ def collision_pairs(robot: RobotModel):
 
 
 # 후보 state에서 충돌이나 접촉이 일어나는지 판단하는 함수
+# return_contacts가 참이면 후보 접촉점 배열을 반환
 def collision_check(
-    robot: RobotModel, state: RobotState, M
-) -> Tuple[bool, bool]:  # (is_collision, is_contact)을 나타내는 불린 튜플을 반환
+    robot: RobotModel, state: RobotState, M, return_contacts=False
+) -> Tuple[bool, bool, np.ndarray]:  # (is_collision, is_contact)을 나타내는 불린 튜플과 접촉점 배열 반환
+    is_contact = False  # contact 여부를 나타내는 flag 변수
+    contact_candidates = []
     old_qpos = robot.state.qpos.copy()
+    candidate_qpos = state.qpos.copy()
     apply_fk(robot, state, M)
 
     for r1, r2 in collision_pairs(robot):
         d = proxy_distance(r1, r2)
         if d <= 0.005:  # if d <= 0.0: # collision detection
-            state.qpos[:] = old_qpos
-            apply_fk(robot, state, M)  # 충돌이라고 판단되면 이전 상태(robot.state)로 rollback
-            return True, False
-        elif d <= 0.01 or d > 0.005:  # contact detection
-            return True, True
+            state.qpos[:] = candidate_qpos
+            robot.state.qpos[:] = old_qpos
+            apply_fk(robot, robot.state, M)  # 이전 상태(robot.state)로 rollback
+            return True, False, None
+        elif 0.005 < d <= 0.01:  # contact detection
+            is_contact = True  # 충돌과 접촉이 공존할 수 있기에 충돌 감지를 먼저 모두 거치고 접촉 여부를 반환하게 함
+            if return_contacts:
+                contact_candidates.append((r1, r2))
 
-    return False, False
+    if is_contact:
+        unique_candidates = set(contact_candidates)
+        state.qpos[:] = candidate_qpos
+        robot.state.qpos[:] = old_qpos
+        apply_fk(robot, robot.state, M)
+
+        return True, True, unique_candidates
+
+    # 이전 상태(robot.state)로 rollback
+    state.qpos[:] = candidate_qpos
+    robot.state.qpos[:] = old_qpos
+    apply_fk(robot, robot.state, M)
+
+    return False, False, None
 
 
 # def contact_pairs():
@@ -75,10 +97,12 @@ def contact_normal():
     return
 
 
-# ContactPoint 배열 반환
-# 접촉 상태 평가는 grasping/...closure.py에서 수행
+# collision_check()로부터 후보 접촉점 배열을 받아 ContactPoint 배열을 생성
 # 접촉점에서의 위치와 힘
-def search_contact_candidates():
+def build_contact_candidates(robot: RobotModel, state: RobotState, M):
+    is_collision, is_contact, contact_candidates = collision_check(robot, state, M, True)
+    if is_collision or not is_contact:
+        return None
     # 접촉점 개수가 7개 이상이 되는지 나타내는 flag 변수도 반환 (3차원 공간 기준)
     # 이는 form closure 평가에서 wrench 벡터들로 positive span을 만들 때 이용
     return

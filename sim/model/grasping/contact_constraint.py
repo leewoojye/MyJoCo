@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import linprog
 import math
 
-from sim.model.collision.collision_check import search_contact_candidates
+from sim.model.collision.collision_check import build_contact_candidates
 from sim.model.math3d.rotation import create_skew
 from spots.utils.util import skew
 
@@ -112,8 +112,8 @@ def impenetrability_check(wrench, V_a, V_b):
 # form closure에서는 모든 접촉점의 wrench로 wrench matrix G를 만들고,
 # force closure는 마찰력을 고려하기에 한 접촉점에서 여러 wrench르 모아 G를 만듦
 def form_closure_check():
-    contact_candidates = search_contact_candidates
-    
+    contact_candidates = build_contact_candidates
+
     # 조건1. G의 rank가 공간 차원 전체
     rank = np.linalg.matrix_rank()
     if rank != 6:  # 평면인 경우 공간인 경우 분기처리하기
