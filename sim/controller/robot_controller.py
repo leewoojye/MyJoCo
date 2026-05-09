@@ -2,7 +2,11 @@ import numpy as np
 import open3d as o3d
 import time
 
-from sim.model.collision import collision_check
+from sim.model.collision.collision_check import collision_check
+from sim.model.grasping.contact_constraint import (
+    apply_body_translation,
+    compute_contact_force_sum,
+)
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
 from sim.model.grasping.form_closure import apply_grasp
@@ -128,6 +132,7 @@ def main():
     trajectory_goal = None
     trajectory_start_time = None
     trajectory_duration = 1.0  # 단일 궤적 시간 고정
+    object_body_name = "pr_cokeCan"
 
     # hand grasp 관련 변수
     grasp_alpha = np.zeros(2)
@@ -178,7 +183,13 @@ def main():
             robot.state.qpos.copy(),
         )
 
+        current_hand_pos = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
+
         apply_ik(robot, candidate_state, target_pos, home_poses, "pose")
+
+        # 손 위치 변위
+        candidate_hand_pos = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
+        hand_displacement = candidate_hand_pos - current_hand_pos
 
         is_collision, is_contact, contacts = collision_check(
             robot,
@@ -187,7 +198,7 @@ def main():
             return_contacts=True,
         )
 
-        if is_collision:
+        if is_collision and not is_contact:
             trajectory_goal = None
             trajectory_start = None
             trajectory_start_time = None
@@ -202,6 +213,29 @@ def main():
 
         # 오른손 손가락
         apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
+
+        # 물체와의 접촉 감지 및 물체 이동 계산
+        object_contacts = []
+        for contact in contacts or []:
+            if contact.normal is None:
+                continue
+
+            if contact.record_a.body_name == object_body_name:
+                contact.normal = -contact.normal
+                object_contacts.append(contact)
+            elif contact.record_b.body_name == object_body_name:
+                object_contacts.append(contact)
+
+        if object_contacts:
+            object_force = compute_contact_force_sum(
+                object_contacts,
+                hand_displacement,
+            )
+            force_norm = np.linalg.norm(object_force)
+
+            if force_norm > 0:
+                object_displacement = np.linalg.norm(hand_displacement) * object_force / force_norm
+                apply_body_translation(robot, object_body_name, object_displacement)
 
         if elapsed >= trajectory_duration:
             trajectory_start = None

@@ -35,36 +35,47 @@ def make_cylinder_proxy(robot: RobotModel, state: RobotState, collision_records)
 
     for record in collision_records:
         mesh = record.mesh
-        bbox = (
-            mesh.get_oriented_bounding_box()
-        )  # open3d 내장함수로 mesh의 바운딩박스를 얻음
-        axis_length_list = np.asarray(bbox.extent)
+        bbox = mesh.get_oriented_bounding_box()  # open3d 내장함수로 mesh의 바운딩박스를 얻음
+        axis_length_list = np.asarray(bbox.extent, dtype=float)
 
         # 실린더 높이 옵션1: 링크의 길이를 실린더의 높이로 설정
         # height = get_link_length(robot, record.body_name, record)
 
         # 실린더 높이 옵션2: bbox의 가장 긴 축을 링크의 길이로 가정
-        axis_max_length = max(
-            axis_length_list[0], max(axis_length_list[1], axis_length_list[2])
-        )
-        radius = (
-            # 실린더 반지름 옵션1. 두 길이 평균의 절반
-            # 실린더 반지름 옵션2. 더 긴 한 축의 절반
-            max(
-                axis_length_list[i]
-                for i in range(3)
-                if axis_length_list[i] != axis_max_length
-            )
-            / 2
-        )
+        long_axis = int(np.argmax(axis_length_list))
+        short_axes = [i for i in range(3) if i != long_axis]
+        axis_max_length = float(axis_length_list[long_axis])
+
+        radius = max(axis_length_list[short_axes[0]], axis_length_list[short_axes[1]]) / 2
+        if axis_max_length <= 0.0 or radius <= 0.0:
+            proxy_records.append(replace(record, mesh=mesh))
+            continue
+
         cylinder = o3d.geometry.TriangleMesh.create_cylinder(
             radius=radius,
             height=axis_max_length,
             resolution=32,
         )  # open3d create 함수는 기본적으로 원점 기준 객체를 반환
-        proxy_records.append(replace(record, mesh=cylinder))
 
-        T = np.eye(4)
+        # cylinder 방향 설정
+        z_axis = bbox.R[:, long_axis]
+        x_axis = bbox.R[:, short_axes[0]]
+        x_axis = x_axis - z_axis * np.dot(z_axis, x_axis)
+
+        if np.linalg.norm(x_axis) < 1e-8:
+            x_axis = bbox.R[:, short_axes[1]]
+            x_axis = x_axis - z_axis * np.dot(z_axis, x_axis)
+
+        x_axis = x_axis / np.linalg.norm(x_axis)
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis = y_axis / np.linalg.norm(y_axis)
+
+        R = np.column_stack([x_axis, y_axis, z_axis])
+        cylinder.rotate(R, center=(0, 0, 0))
+        cylinder.translate(bbox.center)
+        cylinder.compute_vertex_normals()
+
+        proxy_records.append(replace(record, mesh=cylinder))
 
     return proxy_records
 

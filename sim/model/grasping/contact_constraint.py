@@ -5,7 +5,6 @@ import math
 from sim.model.collision.collision_check import build_contact_candidates
 from sim.model.grasping.contact import ContactPoint, ContactType
 from sim.model.math3d.rotation import create_skew
-from spots.utils.util import skew
 
 
 # contact type(mode) 설정
@@ -16,7 +15,7 @@ def contact_type(V_a, V_b, p_a, p_b):  # 트위스트 V, 위치 p 모두 space f
     v_b = V_b[3:, 0]
 
     # 접촉점 p에서 두 강체의 속도가 같으면 붙어있는 rolling 모드로 봄
-    if v_a + skew(w_a) @ p_a == v_b + skew(w_b) @ p_b:
+    if v_a + create_skew(w_a) @ p_a == v_b + create_skew(w_b) @ p_b:
         return ContactType.R
 
     return ContactType.B
@@ -56,6 +55,67 @@ def force_to_wrench(pos, force):
     wrench = np.concatenate([moment, force])
 
     return wrench
+
+
+def compute_contact_force_sum(
+    contact_points,
+    delta_pos,
+    normal_force=1.0,
+    friction_coefficient=0.2,
+):
+    sum_force = np.zeros(3)
+
+    for contact in contact_points:
+        if contact.normal is None:
+            continue
+
+        normal = np.asarray(contact.normal, dtype=float)
+        norm = np.linalg.norm(normal)
+        if norm < 1e-8:
+            continue
+
+        normal = normal / norm
+        normal_amount = np.dot(delta_pos, normal)
+
+        if normal_amount < 0:
+            contact.force = np.zeros(3)
+            continue
+
+        normal_component = normal_amount * normal
+        # 접선 방향 (tangent) = 마찰력 방향, 접촉면으로 미끄러지는 방향
+        tangent_delta = delta_pos - normal_component
+        tangent_norm = np.linalg.norm(tangent_delta)
+
+        friction_force = np.zeros(3)
+        if tangent_norm > 1e-8:
+            tangent_direction = tangent_delta / tangent_norm
+            friction_force = friction_coefficient * normal_force * tangent_direction
+
+        # 이번 스텝에서 contact point에 가해진 force로 갱신
+        # 접촉힘 = 법선힘 + 접선힘
+        contact.force = normal_force * normal + friction_force
+
+        sum_force += contact.force
+
+    return sum_force
+
+
+# 접촉점의 힘으로 인한 강체의 이동을 표현
+def apply_body_translation(robot, body_name, delta_pos):
+    body_node = robot.body_node_for(body_name)
+    joint = body_node.joints[0]
+    addr = joint["qpos_addr"]
+
+    robot.state.qpos[addr : addr + 3] += delta_pos
+
+    delta = np.eye(4)
+    delta[:3, 3] = delta_pos
+
+    for node in body_node.iter_nodes():
+        for record in node.all_records():
+            record.mesh.transform(delta)
+
+        node.world_transform = delta @ node.world_transform
 
 
 # 접촉점 force들을 열벡터로 갖는 matrix를 wrench matrix로 변환
