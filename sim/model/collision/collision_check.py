@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from typing import Tuple
 from sim.model.collision.distance import proxy_distance
 from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.kinematics.ik import apply_ik
@@ -41,39 +42,43 @@ def collision_pairs(robot: RobotModel):
             if r1.body_id == r2.body_id:
                 continue
 
-            if is_adjacent(
-                robot, r1.body_id, r2.body_id
-            ):  # 이웃한 링크들은 충돌 후보에서 제외
+            if is_adjacent(robot, r1.body_id, r2.body_id):  # 이웃한 링크들은 충돌 후보에서 제외
                 continue
 
             yield r1, r2  # 제너레이터 함수
 
 
-# trajectory_goal 위치마다 충돌 여부 판단 후 충돌영역이라고 판단되면 trajectory clipping
-# robot.state: 실제 현재 state
-# 전달인자 state: candidate state
-def collision_check(robot: RobotModel, state: RobotState, M):
+# 후보 state에서 충돌이나 접촉이 일어나는지 판단하는 함수
+def collision_check(
+    robot: RobotModel, state: RobotState, M
+) -> Tuple[bool, bool]:  # (is_collision, is_contact)을 나타내는 불린 튜플을 반환
     old_qpos = robot.state.qpos.copy()
     apply_fk(robot, state, M)
 
     for r1, r2 in collision_pairs(robot):
         d = proxy_distance(r1, r2)
-        if d <= 0.005:  # if d <= 0.0:
+        if d <= 0.005:  # if d <= 0.0: # collision detection
             state.qpos[:] = old_qpos
-            apply_fk(
-                robot, state, M
-            )  # 충돌이라고 판단되면 이전 state(robot.state)로 rollback
-            return True
+            apply_fk(robot, state, M)  # 충돌이라고 판단되면 이전 상태(robot.state)로 rollback
+            return True, False
+        elif d <= 0.01 or d > 0.005:  # contact detection
+            return True, True
 
-    return False
+    return False, False
 
 
 # def contact_pairs():
 #     return
 
 
-# 접촉점 후보 생성
+def contact_normal():
+    return
+
+
+# ContactPoint 배열 반환
 # 접촉 상태 평가는 grasping/...closure.py에서 수행
 # 접촉점에서의 위치와 힘
 def search_contact_candidates():
+    # 접촉점 개수가 7개 이상이 되는지 나타내는 flag 변수도 반환 (3차원 공간 기준)
+    # 이는 form closure 평가에서 wrench 벡터들로 positive span을 만들 때 이용
     return
