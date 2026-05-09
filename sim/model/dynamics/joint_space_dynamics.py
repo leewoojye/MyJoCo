@@ -11,3 +11,24 @@ def wrench_to_torque(J, wrench):  # J: geometric jacobian
 
 def velocity_to_twist(J, qdot):
     return J @ qdot
+
+
+# task space / work space
+def compute_mass_matrix():
+    return
+
+
+def coriolis_matrix():
+    return
+
+
+def gravity_term():
+    return
+
+
+def inverse_dynamics():
+    return
+
+
+def forward_dynamics():
+    return
