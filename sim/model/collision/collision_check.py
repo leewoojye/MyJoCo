@@ -114,6 +114,8 @@ def collision_check(
                         normal=contact_normal(p_a, p_b),
                         distance=d,
                         depth=max(0.0, -d),  # penetration depth
+                        V_a=state.body_twists.get(r_a.body_name, np.zeros(6)),
+                        V_b=state.body_twists.get(r_b.body_name, np.zeros(6)),
                     )
                 )
 

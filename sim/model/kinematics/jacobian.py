@@ -35,14 +35,10 @@ def append_joints(
 
 # omy의 e.e를 position jacobian으로 다루기
 # IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
-def compute_position_jacobian(
-    robot: RobotModel, link_poses=None, target_body="arm_r_link7"
-):
+def compute_position_jacobian(robot: RobotModel, link_poses=None, target_body="arm_r_link7"):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)
-    target_transform = (
-        link_poses[target.name] if link_poses is not None else target.world_transform
-    )
+    target_transform = link_poses[target.name] if link_poses is not None else target.world_transform
     pos_ee = target_transform[:3, 3]
 
     all_joints = []
@@ -80,9 +76,7 @@ def compute_position_jacobian(
 
 
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
-def compute_geometric_jacobian(
-    robot: RobotModel, link_poses=None, target_body="arm_r_link7"
-):
+def compute_geometric_jacobian(robot: RobotModel, link_poses=None, target_body="arm_r_link7"):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)
     # parent = target.parent.copy()
@@ -98,9 +92,7 @@ def compute_geometric_jacobian(
     all_S = []
     joints = []
     for node, joint in all_joints:  # 회전관절 가정 (추후 수정)
-        joint_transform = (
-            link_poses[node.name] if link_poses is not None else node.world_transform
-        )
+        joint_transform = link_poses[node.name] if link_poses is not None else node.world_transform
 
         q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
         w = joint_transform[:3, :3] @ joint["axis"]
@@ -112,14 +104,13 @@ def compute_geometric_jacobian(
     return np.concatenate(all_S, axis=1), joints
 
 
-def finite_difference_position_jacobian():
-    return
+def compute_body_twist(robot: RobotModel, state: RobotState, link_poses=None, target_body="arm_r_link7"):
+    J, joints = compute_geometric_jacobian(robot, link_poses, target_body)
+    qvel = np.array([state.qvel[joint["qpos_addr"]] for joint in joints])
+    
+    return J @ qvel
 
 
 # 특이성 평가
 def manipulability():
-    return
-
-
-def condition_number():
     return

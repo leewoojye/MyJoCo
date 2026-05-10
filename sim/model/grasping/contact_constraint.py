@@ -43,10 +43,13 @@ def force_to_wrench(pos, force):
     return wrench
 
 
+# 접촉점들에 의해 가해지는 힘 벡터를 합산
+# 토크/회전은 반영하지 못하고 있음 (추후 수정)
+# 법선 방향: normal force
+# 접선 방향: friction force
 def compute_contact_force_sum(
     contact_points,
-    displacement,
-    normal_force=1.0,
+    normal_force=0.5,  # 법선 힘의 크기를 호출부에서 받는 형태
     friction_coefficient=0.2,
 ):
     sum_force = np.zeros(3)
@@ -55,33 +58,36 @@ def compute_contact_force_sum(
         if contact.normal is None:
             continue
 
+        v_rel = contact.v_rel  # 물체 기준에서 본 손 속도
+
         normal = np.asarray(contact.normal, dtype=float)
         norm = np.linalg.norm(normal)
         if norm < 1e-8:
             continue
 
         normal = normal / norm
-        normal_amount = np.dot(displacement, normal)
+        normal_amount = np.dot(v_rel, normal)
 
         if normal_amount < 0:
             contact.force = np.zeros(3)
             continue
 
-        normal_component = normal_amount * normal
-        # 접선 방향 (tangent) = 마찰력 방향, 접촉면으로 미끄러지는 방향
-        tangent_delta = displacement - normal_component
+        normal_component = normal_amount * normal  # 상대속도의 법선 성분으로, 접선 성분을 구하기 위해 계산
+        # 접선 벡터 (tangent, 마찰력 방향) 계산
+        tangent_delta = v_rel - normal_component
         tangent_norm = np.linalg.norm(tangent_delta)
 
         friction_force = np.zeros(3)
         if tangent_norm > 1e-8:
             tangent_direction = tangent_delta / tangent_norm
-            friction_force = friction_coefficient * normal_force * tangent_direction
+            friction_amount = np.linalg.norm(friction_coefficient * normal_force)
+            friction_force = friction_amount * tangent_direction
 
         # 이번 스텝에서 contact point에 가해진 force로 갱신
         # 접촉힘 = 법선힘 + 접선힘
         contact.force = normal_force * normal + friction_force
 
-        sum_force += contact.force
+        sum_force += contact.force # 문제: 힘 벡터 방향이 서로 비슷할 경우 
 
     return sum_force
 
@@ -92,6 +98,7 @@ def apply_body_translation(robot, body_name, displacement):
     joint = body_node.joints[0]
     addr = joint["qpos_addr"]
 
+    # qvel update는 tick/controller에서 실제 적용된 qpos 차분과 dt로 처리한다.
     robot.state.qpos[addr : addr + 3] += displacement
 
     delta = np.eye(4)

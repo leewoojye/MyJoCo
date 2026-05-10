@@ -28,11 +28,12 @@ class RobotState:
         self.qpos_widths = dict(qpos_widths)
         self.qpos = np.asarray(initial_qpos, dtype=float).copy()
         # dynamics
-        self.mass = {addr: 0.35 for addr in qpos_addrs}
-        self.qvel = {addr: 0.0 for addr in qpos_addrs}
-        self.qacc = {addr: 0.0 for addr in qpos_addrs}
-        self.force = {addr: 0.0 for addr in qpos_addrs}
-        self.tau = {addr: 0.0 for addr in qpos_addrs}
+        # self.mass = {addr: 0.35 for addr in qpos_addrs} # BodyNode로 편입
+        self.qvel = np.zeros_like(self.qpos)
+        self.qacc = np.zeros_like(self.qvel)
+        self.tau = np.zeros_like(self.qvel)
+        self.body_twists = {}
+        # self.force = {addr: 0.0 for addr in qpos_addrs}
 
     @classmethod
     def from_model(cls, model, keyframe_name="home"):
