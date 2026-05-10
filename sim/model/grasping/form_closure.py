@@ -1,17 +1,8 @@
 import numpy as np
-import scipy
 from sim.model.grasping.contact_constraint import force_to_wrench, has_positive_k
 from sim.model.kinematics.fk import compute_fk, apply_fk
-from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
-from sim.model.math3d.rotation import omega2rotation_matrix
-from sim.model.math3d.transform import create_transform_matrix
 from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
-from sim.model.math3d.lie import Adjoint
-from sim.model.kinematics.jacobian import (
-    compute_position_jacobian,
-    compute_geometric_jacobian,
-)
 
 
 def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
@@ -23,6 +14,7 @@ def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
         # 엄지 자세 q를 배열로 하드코딩
         q_open_list = [0.3, -1.57, 0.35, 0.25]
         q_closed_list = [0.4, -1.57, 0.8, 0.7]
+
         for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
             finger_node = robot.body_node_for(f"finger_r_link{i}")
             joint = finger_node.joints[0]
