@@ -6,6 +6,7 @@ from sim.model.collision.distance import get_proxy, proxy_distance
 from sim.model.collision.proxy import BoxProxy, CapsuleProxy
 from sim.model.grasping.contact import ContactPoint
 from sim.model.kinematics.fk import apply_fk
+from sim.model.math3d.vector import contact_normal
 from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
 
@@ -57,7 +58,7 @@ def collision_pairs(robot: RobotModel):
 
 # 후보 state에서 충돌이나 접촉이 일어나는지 판단하는 함수
 # return_contacts가 참이면 후보 접촉점 배열을 반환
-def collision_check(
+def check_collision(
     robot: RobotModel, state: RobotState, home_pose, return_contacts=False
 ) -> Tuple[bool, bool, np.ndarray]:  # (is_collision, is_contact)을 나타내는 불린 튜플과 접촉점 배열 반환
     is_contact = False  # contact 여부를 나타내는 flag 변수
@@ -158,21 +159,10 @@ def collision_check(
     return False, False, None
 
 
-# a->b 방향 법선 단위 벡터
-def contact_normal(point_a, point_b):
-    normal = point_b - point_a
-    norm = np.linalg.norm(normal)
-
-    if norm < 1e-8:  # 크기가 0으로 수렴하는 법선벡터 처리
-        return None
-
-    return normal / norm
-
-
 # collision_check()로부터 후보 접촉점 배열을 받아 ContactPoint 배열을 생성
 # 접촉점에서의 위치와 힘
 def build_contact_candidates(robot: RobotModel, state: RobotState, M):
-    is_collision, is_contact, contact_candidates = collision_check(robot, state, M, True)
+    is_collision, is_contact, contact_candidates = check_collision(robot, state, M, True)
     contactpoint_list = []
     if is_collision or not is_contact:
         return None

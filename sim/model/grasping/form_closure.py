@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from sim.model.grasping.contact_constraint import force_to_wrench, has_positive_k
 from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
 from sim.model.math3d.rotation import omega2rotation_matrix
@@ -11,10 +12,6 @@ from sim.model.kinematics.jacobian import (
     compute_position_jacobian,
     compute_geometric_jacobian,
 )
-
-
-def check_form_closure():
-    return
 
 
 def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
@@ -30,9 +27,7 @@ def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
             finger_node = robot.body_node_for(f"finger_r_link{i}")
             joint = finger_node.joints[0]
             qpos_index = joint["qpos_addr"]
-            state.qpos[qpos_index] = (1 - alpha) * q_open_list[
-                index
-            ] + alpha * q_closed_list[index]
+            state.qpos[qpos_index] = (1 - alpha) * q_open_list[index] + alpha * q_closed_list[index]
     else:  # 엄지를 제외한 관절들 업데이트
         for i in range(5, 21):
             finger_node = robot.body_node_for(f"finger_r_link{i}")
@@ -49,3 +44,32 @@ def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, isThumb=False):
     robot = apply_fk(robot, state, M)
 
     return robot
+
+
+# form closure에서는 모든 접촉점의 wrench로 wrench matrix G를 만들고,
+# force closure는 마찰력을 고려하기에 한 접촉점에서 여러 wrench르 모아 G를 만듦
+def check_form_closure(contact_points):
+    # 조건0: positive span이 공간 전체를 덮어야 해 최소 7개의 접촉점을 가져야함 (공간 기준)
+    if len(contact_points) < 7:
+        return False
+    
+    wrenches = [
+        force_to_wrench(contact.point, contact.normal) for contact in contact_points if contact.normal is not None
+    ]
+
+    if not wrenches:
+        return False
+
+    G = np.column_stack(wrenches)
+
+    # 조건1. G의 rank가 공간 차원 전체
+    rank = np.linalg.matrix_rank(G)
+
+    if rank != 6:  # 평면인 경우 공간인 경우 분기처리하기
+        return False
+
+    # 조건2. Gk = 0, k > 0를 만족하는 k가 존재
+    if not has_positive_k(G):
+        return False
+
+    return True

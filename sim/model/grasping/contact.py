@@ -3,6 +3,7 @@ from enum import Enum  # 상수를 묶는 용도
 import numpy as np
 
 from sim.model.math3d.rotation import create_skew
+from sim.model.math3d.vector import contact_tangent
 from sim.model.robot.geometry import GeomRecord
 
 
@@ -26,10 +27,13 @@ class ContactPoint:
     depth: float  # penetration depth, 손과 캔이 관통 상태일 때도 contact 상태로 취급하고 관통한 깊이를 캔 이동거리 계산에 활용함
     # 법선 단위 벡터
     normal: np.ndarray
+    # 접선 단위 벡터
+    tangent: np.ndarray | None = None
 
     # 트위스트
-    V_a: np.ndarray
-    V_b: np.ndarray
+    V_a: np.ndarray | None = None
+    V_b: np.ndarray | None = None
+    V_rel: np.ndarray | None = None  # 상대 트위스트
     # 가상 접촉점: 접촉에 있어 소량의 거리를 허용하므로, 실제 접촉점과 별개로 가상 접촉점이 필요
     point: np.ndarray | None = None
     # 접촉점 유형
@@ -38,17 +42,19 @@ class ContactPoint:
     v_a: np.ndarray | None = None
     v_b: np.ndarray | None = None
     v_rel: np.ndarray | None = None  # 상대속도
-    # 힘
+    # 힘: normal 벡터와 내적하면 normal force, tangent 벡터와 내적하면 마찰력을 구할 수 있음
     force: np.ndarray | None = None
 
     def __post_init__(self):
         self.V_a = np.asarray(self.V_a, dtype=float).reshape(6)
         self.V_b = np.asarray(self.V_b, dtype=float).reshape(6)
+        self.V_rel = self.V_a - self.V_b
         self.depth = max(0, -self.distance)
         self.point = 0.5 * (self.p_a + self.p_b)
         self.v_a = self.V_a[3:] + create_skew(self.V_a[:3]) @ self.p_a
         self.v_b = self.V_b[3:] + create_skew(self.V_b[:3]) @ self.p_b
         self.v_rel = self.v_a - self.v_b
+        self.tangent = contact_tangent(self.v_rel, self.normal)
         self.contact_type = contact_type(self)
 
 

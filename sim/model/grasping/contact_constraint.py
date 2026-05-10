@@ -29,6 +29,7 @@ def cone_approximation():
 # 접촉점 하나에 대해 friction cone 하나
 def friction_cone_constraint():
     # half_angle
+
     return
 
 
@@ -47,7 +48,7 @@ def force_to_wrench(pos, force):
 # 토크/회전은 반영하지 못하고 있음 (추후 수정)
 # 법선 방향: normal force
 # 접선 방향: friction force
-def compute_contact_force_sum(
+def sum_contact_force(
     contact_points,
     normal_force=0.5,  # 법선 힘의 크기를 호출부에서 받는 형태
     friction_coefficient=0.2,
@@ -72,14 +73,14 @@ def compute_contact_force_sum(
             contact.force = np.zeros(3)
             continue
 
-        normal_component = normal_amount * normal  # 상대속도의 법선 성분으로, 접선 성분을 구하기 위해 계산
-        # 접선 벡터 (tangent, 마찰력 방향) 계산
-        tangent_delta = v_rel - normal_component
-        tangent_norm = np.linalg.norm(tangent_delta)
+        # normal_component = normal_amount * normal  # 상대속도의 법선 성분으로, 접선 성분을 구하기 위해 계산
+        # # 접선 벡터 (tangent, 마찰력 방향) 계산
+        # tangent_delta = v_rel - normal_component
+        # tangent_norm = np.linalg.norm(tangent_delta)
 
         friction_force = np.zeros(3)
-        if tangent_norm > 1e-8:
-            tangent_direction = tangent_delta / tangent_norm
+        if contact.tangent is not None:
+            tangent_direction = contact.tangent
             friction_amount = np.linalg.norm(friction_coefficient * normal_force)
             friction_force = friction_amount * tangent_direction
 
@@ -87,7 +88,7 @@ def compute_contact_force_sum(
         # 접촉힘 = 법선힘 + 접선힘
         contact.force = normal_force * normal + friction_force
 
-        sum_force += contact.force # 문제: 힘 벡터 방향이 서로 비슷할 경우 
+        sum_force += contact.force  # 문제: 힘 벡터 방향이 서로 비슷할 경우
 
     return sum_force
 
@@ -113,15 +114,20 @@ def apply_body_translation(robot, body_name, displacement):
 
 # 접촉점 force들을 열벡터로 갖는 matrix를 wrench matrix로 변환
 # 단일 접촉점에 대해 여러 wrench 벡터가 있을 수 있고, 이들을 열벡터로 하는 행렬이 wrench matrix G
-def force_to_wrench_matrix(point: ContactPoint):
-    # for i in range(len(f)):
-    #     G[:,i]=
-    return
+# def force_to_wrench_matrix(point: ContactPoint):
+#     # for i in range(len(f)):
+#     #     G[:,i]=
+
+#     return
 
 
 # 접촉점 wrench들을 열벡터로 갖는 wrench matrix G
-# def contact_wrench_matrix():
-#     return
+# 한 접촉점에 대한 힘(법선, 접선, 마찰력..) 행렬?
+# def contact_wrench_matrix(contact):
+#     forces = [contact.force for contact in contact_points if contact.force is not None]
+#     G = np.column_stack(forces)
+
+#     return G
 
 
 def composite_wrench_cone():
@@ -133,31 +139,9 @@ def single_contact_constraint():
 
 
 def multiple_contact_constraint():
-    # impenetrability_check()
     return
 
 
 # 비침투 조건
-def impenetrability_check(wrench, V_a, V_b):
-    # 접촉 법선 wrench와 두 물체의 트위스트 V_a, V_b
-    V_rel = V_a - V_b  # 상대 트위스트
-    return wrench.T @ (V_rel) >= 0
-
-
-# form closure에서는 모든 접촉점의 wrench로 wrench matrix G를 만들고,
-# force closure는 마찰력을 고려하기에 한 접촉점에서 여러 wrench르 모아 G를 만듦
-def form_closure_check():
-    contact_candidates = build_contact_candidates
-
-    # 조건1. G의 rank가 공간 차원 전체
-    rank = np.linalg.matrix_rank()
-    if rank != 6:  # 평면인 경우 공간인 경우 분기처리하기
-        return False
-    # 조건2. Gk=0,k>0를 만족하는 k가 존재
-    if not has_positive_k():
-        return False
-    return True
-
-
-def force_closure_check():
-    return
+def check_impenetrability(contact):  # 단일 접촉점
+    return contact.normal.T @ contact.V_rel >= 0  # 상대 트위스트의 법선 성분
