@@ -110,18 +110,19 @@ def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target
         # if np.abs(e) <= 1e-4:
         if np.linalg.norm(e) <= 1e-4:
             break
-        if iter > 100:
+        if iter > 20:
             break
 
         iter += 1
 
-    # 각변위 제한 (rad), 추후 수정
-    max_theta_step = 0.1
-    delta_theta = theta - theta_prev
-    delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
-    # state.qpos = theta_prev + delta_theta
-    state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
-    # state.qpos = theta
+    # 각변위 제한: 사용자 지정 제약 + xml 명세 기반 제약
+    # max_theta_step = 0.1
+    # delta_theta = theta - theta_prev
+    # delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
+    # state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
+
+    # 각변위 제한 없는 버전
+    state.qpos = clamp_joint_ranges(theta, joints)
 
     return state
 
@@ -164,23 +165,26 @@ def solve_newton_raphson_geometric(
 
         if np.linalg.norm(twist_error) <= 1e-4:
             break
-        if iter > 100:
+        if iter > 20:
             break
 
         iter += 1
 
-    # 각변위 제한 (rad), 추후 수정
-    max_theta_step = 0.1
-    delta_theta = theta - theta_prev
-    delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
-    # state.qpos = theta_prev + delta_theta
-    state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
+    # 각변위 제한: 사용자 지정 제약 + xml 명세 기반 제약
+    # max_theta_step = 0.1
+    # delta_theta = theta - theta_prev
+    # delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
+    # state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
+
+    # 각변위 제한 없는 버전
+    state.qpos = clamp_joint_ranges(theta, joints)
 
     return state
 
 
 def solve_position_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"):
     new_state = solve_newton_raphson_coordinate(robot, state, target_pos, home_pose, target_body)
+
     return new_state
 
 
