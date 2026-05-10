@@ -12,6 +12,7 @@ from sim.model.kinematics.ik import apply_ik
 from sim.model.grasping.force_closure import evaluate_grasp_state
 from sim.model.grasping.form_closure import compute_grasp
 from sim.model.kinematics.jacobian import compute_body_twist, compute_geometric_jacobian
+from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import interpolate_position
 from sim.model.robot.loader_with_mujoco import build_robot_geometries
 from sim.model.robot.robot_state import RobotState
@@ -128,11 +129,13 @@ def main():
     home_poses["_qpos"] = robot.state.qpos.copy()
     right_target_body = "arm_r_link7"
     left_target_body = "arm_l_link7"
+    right_target_base_rot = robot.body_node_for(right_target_body).world_transform[:3, :3].copy()
     left_hand_pos = (
         robot.body_node_for(left_target_body).world_transform[:3, 3].copy()
     )  # position IK로 위치를 고정할 왼손 위치 추출
 
-    target_goal = None  # target panel에서 주어진 목표
+    target_goal = None  # target panel에서 주어진 x, y, z
+    target_rot = np.zeros(3)  # 주어진 roll, pitch, yaw
 
     # 로봇팔 궤적 관련 변수
     trajectory_start = None
@@ -165,11 +168,12 @@ def main():
     }
 
     # callback 함수
-    def handle_target_changed(target_pos):
-        nonlocal target_goal
+    def handle_target_changed(target):
+        nonlocal target_goal, target_rot
 
         # 타겟패널입력은 새로운 궤적 생성 타이밍에 관여하며, 입력을 감지하면 trajectory 관련 변수를 갱신함
-        target_goal = target_pos.copy()
+        target_goal = target[:3].copy()
+        target_rot = target[3:].copy()
 
     def handle_grasp_changed(alpha, is_thumb):
         nonlocal grasp_goal, grasp_goal_is_thumb
@@ -228,6 +232,10 @@ def main():
         )
 
         if target_goal is not None:
+            # rot = rpy2rotation_matrix(target_rot[0], target_rot[1], target_rot[2])
+            rot_offset = rpy2rotation_matrix(target_rot[0], target_rot[1], target_rot[2])
+            rot = right_target_base_rot @ rot_offset
+
             # 오른손에 pose IK 계산, 캔 잡는 모션을 더 용이하게
             apply_ik(
                 robot,
@@ -236,6 +244,7 @@ def main():
                 home_poses,
                 "pose",  # "pose"
                 right_target_body,
+                rot=rot,  # roll, yaw, pitch 변환 행렬
             )
 
             # 왼손은 position IK 계산
@@ -272,7 +281,7 @@ def main():
             last_tick_time = None
             trajectory_elapsed = 0.0
             grasp_goal = None
-            return current_hand_pos.copy()
+            return np.r_[current_hand_pos.copy(), target_rot.copy()]
 
         robot.state.qpos[:] = candidate_state.qpos
 

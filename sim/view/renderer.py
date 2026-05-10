@@ -21,6 +21,7 @@ def run_target_window(
     on_grasp_changed=None,
     on_tick=None,
     slider_range=(-0.2, 0.2),  # end-effector 조작 범위(단위: m)
+    rotation_slider_range=(-0.15, 0.15),  # roll, pitch, yaw 조작 범위(단위: rad)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
     # grasp panel에는 alpha의 범위 (0.0, 1.0)를 전달
 ):
@@ -68,6 +69,7 @@ def run_target_window(
         initial_target if initial_target is not None else target_position(robot_geometries),
         on_target_changed=handle_target_changed,
         slider_range=slider_range,
+        rotation_slider_range=rotation_slider_range,
     )
 
     grasp_pose_panel = GraspPanel(

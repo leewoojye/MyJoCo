@@ -125,12 +125,13 @@ def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target
 
 
 def solve_newton_raphson_geometric(
-    robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"
+    robot: RobotModel, state: RobotState, target_pos, rot, home_pose, target_body="arm_r_link7"
 ):  # target_body->end-effector 인스턴스 수정예정
     T_sb = robot.body_node_for(target_body).world_transform
     T_sd = T_sb.copy()
     T_sd[:3, 3] = target_pos
-    # twist_error_mat, twist_error = calculate_twist_error(T_sb, T_sd)
+    # T_sd[:3, :3] = T_sd[:3, :3] @ rot  # 현재 회전에 RPY를 계속 곱하면 목표가 매 tick 도망감
+    T_sd[:3, :3] = rot  # 기준 회전에 RPY offset을 적용한 절대 목표 회전
 
     theta_prev = state.qpos.copy()
     theta = state.qpos.copy()
@@ -192,24 +193,19 @@ def solve_position_ik(robot: RobotModel, state: RobotState, target_pos, home_pos
 
 # position + pose (6D twist) 기반 자코비안 행렬 활용
 # target_pos(3,): input position
-def solve_pose_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"):
-    new_state = solve_newton_raphson_geometric(robot, state, target_pos, home_pose, target_body)
+def solve_pose_ik(robot: RobotModel, state: RobotState, target_pos, rot, home_pose, target_body="arm_r_link7"):
+    new_state = solve_newton_raphson_geometric(robot, state, target_pos, rot, home_pose, target_body)
 
     return new_state
 
 
 # IK로 state의 qpos만 갱신함. FK/mesh 갱신은 호출부에서 확정된 state에 대해 수행.
 def apply_ik(
-    robot: RobotModel,
-    state: RobotState,
-    target_pos,
-    home_pose,
-    mode="position",
-    target_body="arm_r_link7",
+    robot: RobotModel, state: RobotState, target_pos, home_pose, mode="position", target_body="arm_r_link7", rot=None
 ):
     if mode == "position":
         new_state = solve_position_ik(robot, state, target_pos, home_pose, target_body)
     elif mode == "pose":
-        new_state = solve_pose_ik(robot, state, target_pos, home_pose, target_body)
+        new_state = solve_pose_ik(robot, state, target_pos, rot, home_pose, target_body)
 
     return new_state
