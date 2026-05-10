@@ -78,6 +78,7 @@ def main():
 
     # 새로운 state 인스턴스 생성 예시 (omy.xml)
     state = robot.state  # robot state 필드 참조, set()으로 수정 가능
+
     # state_omy = RobotState.from_model(robot.model) # robot 클래스 state와 독립적인 state 인스턴스 생성
     # state_omy.set("Joint1", 0.5)
     # state_omy.set("Joint2", -0.4)
@@ -164,15 +165,10 @@ def main():
     }
 
     # callback 함수
-    # 패널입력, 시간을 받아 궤적 생성 -> ...
     def handle_target_changed(target_pos):
         nonlocal target_goal
-        # trajectory_start = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
-        # trajectory_start = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
 
         # 타겟패널입력은 새로운 궤적 생성 타이밍에 관여하며, 입력을 감지하면 trajectory 관련 변수를 갱신함
-        # trajectory_goal = target_pos.copy()
-        # trajectory_start_time = time.perf_counter()
         target_goal = target_pos.copy()
 
     def handle_grasp_changed(alpha, is_thumb):
@@ -221,8 +217,6 @@ def main():
 
             trajectory_elapsed += raw_dt
 
-            # elapsed = time.perf_counter() - trajectory_start_time
-            # t = min(elapsed, trajectory_duration)
             t = min(trajectory_elapsed, trajectory_duration)
             target_pos = interpolate_position(trajectory_start, trajectory_goal, trajectory_duration, t)
 
@@ -316,8 +310,7 @@ def main():
                     target_body=body_name,
                 )
 
-        # 접촉 bodynode에 기반해 캔의 변위 설정
-        if can_grasp:
+        if can_grasp:  # 접촉 bodynode에 기반해 캔의 변위 설정
             contact_body_pos = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
             body_node = robot.body_node_for(object_body_name)
             object_pos = body_node.world_transform[:3, 3].copy()
@@ -393,8 +386,7 @@ def main():
             force_norm = np.linalg.norm(object_force)
 
             if force_norm > 0:
-                # 가속도를 적분하여 변위 계산
-                object_acc = object_force / 0.35  # mass: 0.35
+                object_acc = object_force / 0.35  # 가속도를 적분하여 변위 계산
                 # object_vel = object_acc * dt
                 object_displacement = 0.5 * object_acc * physics_dt**2
                 apply_body_translation(robot, object_body_name, object_displacement)
