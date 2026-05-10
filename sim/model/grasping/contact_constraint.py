@@ -1,9 +1,6 @@
 import numpy as np
 from scipy.optimize import linprog
-import math
 
-from sim.model.collision.collision_check import build_contact_candidates
-from sim.model.grasping.contact import ContactPoint, ContactType
 from sim.model.math3d.rotation import create_skew
 
 

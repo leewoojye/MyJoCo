@@ -71,3 +71,7 @@ def solve_contact_forces(contact_points, external_wrench, friction_coefficient):
 
     edge_weights = result.x
     return True, edge_weights
+
+
+def evaluate_grasp_hold(contact_points, external_wrench, friction_coefficient):
+    return solve_contact_forces(contact_points, external_wrench, friction_coefficient)

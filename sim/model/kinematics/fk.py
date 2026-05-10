@@ -1,5 +1,4 @@
 import numpy as np
-from sim.model.math3d.rotation import create_skew
 from sim.model.math3d.screw import screw_hat, unit_screw_axis
 from scipy.linalg import expm
 from sim.model.robot.body import BodyNode
