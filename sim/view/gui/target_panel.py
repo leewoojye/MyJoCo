@@ -18,6 +18,7 @@ class TargetPanel:
         self.widget = gui.Vert(6, gui.Margins(8, 8, 8, 8))
         self._sliders = []
         self._value_labels = []
+        self._is_setting_target = False
 
         self.widget.add_child(gui.Label("Right hand pose target"))
         for index, axis_name in enumerate(("dX", "dY", "dZ")):
@@ -45,18 +46,27 @@ class TargetPanel:
         self.offset[index] = float(value)
         self.target = self.base_target + self.offset # ik solver가 받을 하위목표지점 계산
         self._value_labels[index].text = f"{value:.3f}"
-        if self.on_target_changed is not None: # 움직이면 있으면 callback 함수를 호출
+        if self.on_target_changed is not None and not self._is_setting_target: # 움직이면 있으면 callback 함수를 호출
             self.on_target_changed(self.target.copy())
 
     # 프로그램 내부에서 패널UI의 타겟을 강제로 설정할 때 사용
     # self-collision solver의 부품으로 사용될 수 있음
-    def set_target(self, target, notify=False):
-        self.base_target[:] = np.asarray(target, dtype=float).reshape(3)
-        self.offset[:] = 0.0
-        self.target = self.base_target.copy()
-        for index, slider in enumerate(self._sliders):
-            slider.double_value = 0.0
-            self._value_labels[index].text = "0.000"
+    def set_target(self, target, notify=False, reset_base=True):
+        self._is_setting_target = True
+        try:
+            target = np.asarray(target, dtype=float).reshape(3)
+            if reset_base:
+                self.base_target[:] = target
+                self.offset[:] = 0.0
+            else:
+                self.offset[:] = target - self.base_target
+
+            self.target = self.base_target + self.offset
+            for index, slider in enumerate(self._sliders):
+                slider.double_value = self.offset[index]
+                self._value_labels[index].text = f"{self.offset[index]:.3f}"
+        finally:
+            self._is_setting_target = False
 
         if notify and self.on_target_changed is not None:
             self.on_target_changed(self.target.copy())

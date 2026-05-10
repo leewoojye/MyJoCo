@@ -21,14 +21,18 @@ def initial_qpos_from_keyframe(model, keyframe_name="home"):
 
 
 class RobotState:
-    """Current robot joint state, separated from the body tree structure."""
-
     def __init__(self, joint_names, qpos_addrs, qpos_widths, initial_qpos):
         self.joint_names = list(joint_names)
         self.joint_index = {name: i for i, name in enumerate(self.joint_names)}
         self.qpos_addrs = dict(qpos_addrs)
         self.qpos_widths = dict(qpos_widths)
         self.qpos = np.asarray(initial_qpos, dtype=float).copy()
+        # dynamics
+        self.mass = {addr: 0.35 for addr in qpos_addrs}
+        self.qvel = {addr: 0.0 for addr in qpos_addrs}
+        self.qacc = {addr: 0.0 for addr in qpos_addrs}
+        self.force = {addr: 0.0 for addr in qpos_addrs}
+        self.tau = {addr: 0.0 for addr in qpos_addrs}
 
     @classmethod
     def from_model(cls, model, keyframe_name="home"):
@@ -45,9 +49,7 @@ class RobotState:
             )
             joint_names.append(joint_name)
             qpos_addrs[joint_name] = int(model.jnt_qposadr[joint_id])
-            qpos_widths[joint_name] = qpos_width_for_joint_type(
-                model.jnt_type[joint_id]
-            )
+            qpos_widths[joint_name] = qpos_width_for_joint_type(model.jnt_type[joint_id])
 
         return cls(
             joint_names=joint_names,
@@ -68,9 +70,7 @@ class RobotState:
         values = np.asarray(value, dtype=float).reshape(-1)
 
         if values.size != width:
-            raise ValueError(
-                f"{joint_name} expects {width} qpos value(s), got {values.size}"
-            )
+            raise ValueError(f"{joint_name} expects {width} qpos value(s), got {values.size}")
 
         self.qpos[addr : addr + width] = values
 

@@ -141,16 +141,25 @@ def main():
     last_tick_time = None
     trajectory_elapsed = 0.0
     trajectory_duration = 1.0  # 단일 궤적 시간 고정
-    object_body_name = "pr_cokeCan"
+    object_body_name = "pr_cokeCan" # 상호작용할 물체 지정 (추후 리펙토링)
 
     # hand grasp 관련 변수
     grasp_alpha = np.zeros(2)
     isThumb = False
 
+    # dynamics 상태 관리
+    dynamics_dict = {
+        "pr_cokeCan": {
+            "mass": 0.35,
+            "velocity": np.zeros(3),
+            "acceleration": np.zeros(3),
+            "force": np.zeros(3),
+        }
+    }
+
     # callback 함수
     # 패널입력, 시간을 받아 궤적 생성 -> ...
     def handle_target_changed(target_pos):
-        # nonlocal trajectory_start, trajectory_goal, trajectory_start_time
         nonlocal target_goal
         # trajectory_start = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
         # trajectory_start = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
@@ -191,8 +200,14 @@ def main():
 
     # 패널 감지 콜백함수가 궤적 생성 시점에 관여한다면, tick(유사 clock) 콜백함수가 로봇의 실제 ik 적용과 렌더링을 맡음
     def handle_tick():
-        # nonlocal trajectory_start, trajectory_goal, trajectory_start_time, isThumb
-        nonlocal trajectory_start, trajectory_goal, target_goal, last_tick_time, trajectory_elapsed, isThumb
+        nonlocal \
+            trajectory_start, \
+            trajectory_goal, \
+            target_goal, \
+            last_tick_time, \
+            trajectory_elapsed, \
+            isThumb, \
+            dynamics_dict
 
         if target_goal is None:
             return False
@@ -222,13 +237,6 @@ def main():
         t = min(trajectory_elapsed, trajectory_duration)
         target_pos = interpolate_position(trajectory_start, trajectory_goal, trajectory_duration, t)
 
-        # 오른손에 pose IK 적용
-        # apply_ik(robot, robot.state, target_pos, home_poses, "pose")
-        # # 왼손은 position IK 적용
-        # # apply_ik(robot, robot.state, target_pos, home_poses, "position")
-        # # 오른손 손가락
-        # apply_grasp(robot, state, home_poses, selected_grasp_alpha(), isThumb)
-
         candidate_state = RobotState(
             robot.state.joint_names,
             robot.state.qpos_addrs,
@@ -236,17 +244,17 @@ def main():
             robot.state.qpos.copy(),
         )
 
-        # current_hand_pos = robot.body_node_for("hx5_r_base").world_transform[:3, 3].copy()
-        # current_hand_pos = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
-
+        # 오른손에 pose IK 계산
         apply_ik(
             robot,
             candidate_state,
             target_pos,
             home_poses,
-            "pose",
+            "position",  # "pose"
             right_target_body,
         )
+
+        # 왼손은 position IK 계산
         apply_ik(
             robot,
             candidate_state,
@@ -256,7 +264,7 @@ def main():
             left_target_body,
         )
 
-        # e.e 위치 변위
+        # e.e 변위 계산
         candidate_poses = compute_fk(robot, candidate_state, home_poses)
         candidate_hand_pos = candidate_poses[right_target_body][:3, 3].copy()
         hand_displacement = candidate_hand_pos - current_hand_pos
@@ -275,16 +283,16 @@ def main():
             target_goal = None
             last_tick_time = None
             trajectory_elapsed = 0.0
-            return False
+            return current_hand_pos.copy()
 
         robot.state.qpos[:] = candidate_state.qpos
 
-        # 오른손에 FK 적용
+        # FK 적용: 왼손, 오른손, 손가락 동시에
         apply_fk(robot, robot.state, home_poses)
 
         # 왼손은 position IK -> FK (closed-chain...)
 
-        # 물체와의 접촉 감지 및 물체 이동 계산
+        # 물체와의 접촉 감지 및 물체 변위 계산
         object_contacts = []
         for contact in contacts or []:
             if contact.normal is None:
@@ -304,11 +312,10 @@ def main():
             force_norm = np.linalg.norm(object_force)
 
             if force_norm > 0:
-                # e.e 위치 변위를 물체 이동에 반영 (추후 수정)
+                # e.e 변위를 물체 이동에 반영 (추후 수정)
                 object_displacement = np.linalg.norm(hand_displacement) * object_force / force_norm
                 apply_body_translation(robot, object_body_name, object_displacement)
 
-        # if elapsed >= trajectory_duration:
         if trajectory_elapsed >= trajectory_duration:
             trajectory_start = None
             trajectory_goal = None

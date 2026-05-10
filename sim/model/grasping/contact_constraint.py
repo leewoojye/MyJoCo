@@ -7,20 +7,6 @@ from sim.model.grasping.contact import ContactPoint, ContactType
 from sim.model.math3d.rotation import create_skew
 
 
-# contact type(mode) 설정
-def contact_type(V_a, V_b, p_a, p_b):  # 트위스트 V, 위치 p 모두 space frame
-    w_a = V_a[:3, 0]
-    w_b = V_b[:3, 0]
-    v_a = V_a[3:, 0]
-    v_b = V_b[3:, 0]
-
-    # 접촉점 p에서 두 강체의 속도가 같으면 붙어있는 rolling 모드로 봄
-    if v_a + create_skew(w_a) @ p_a == v_b + create_skew(w_b) @ p_b:
-        return ContactType.R
-
-    return ContactType.B
-
-
 # 선형계획 문제를 푸는 linprog() 사용
 def has_positive_k(G, eps=1e-6):
     m = G.shape[1]
@@ -59,7 +45,7 @@ def force_to_wrench(pos, force):
 
 def compute_contact_force_sum(
     contact_points,
-    delta_pos,
+    displacement,
     normal_force=1.0,
     friction_coefficient=0.2,
 ):
@@ -75,7 +61,7 @@ def compute_contact_force_sum(
             continue
 
         normal = normal / norm
-        normal_amount = np.dot(delta_pos, normal)
+        normal_amount = np.dot(displacement, normal)
 
         if normal_amount < 0:
             contact.force = np.zeros(3)
@@ -83,7 +69,7 @@ def compute_contact_force_sum(
 
         normal_component = normal_amount * normal
         # 접선 방향 (tangent) = 마찰력 방향, 접촉면으로 미끄러지는 방향
-        tangent_delta = delta_pos - normal_component
+        tangent_delta = displacement - normal_component
         tangent_norm = np.linalg.norm(tangent_delta)
 
         friction_force = np.zeros(3)
@@ -101,15 +87,15 @@ def compute_contact_force_sum(
 
 
 # 접촉점의 힘으로 인한 강체의 이동을 표현
-def apply_body_translation(robot, body_name, delta_pos):
+def apply_body_translation(robot, body_name, displacement):
     body_node = robot.body_node_for(body_name)
     joint = body_node.joints[0]
     addr = joint["qpos_addr"]
 
-    robot.state.qpos[addr : addr + 3] += delta_pos
+    robot.state.qpos[addr : addr + 3] += displacement
 
     delta = np.eye(4)
-    delta[:3, 3] = delta_pos
+    delta[:3, 3] = displacement
 
     for node in body_node.iter_nodes():
         for record in node.all_records():

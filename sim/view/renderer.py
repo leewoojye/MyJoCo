@@ -1,6 +1,7 @@
 import open3d as o3d
 import open3d.visualization.gui as gui
 import open3d.visualization.rendering as rendering
+import numpy as np
 
 from sim.view.gui.target_panel import TargetPanel
 from sim.view.gui.grasp_panel import GraspPanel
@@ -19,7 +20,7 @@ def run_target_window(
     on_target_changed=None,
     on_grasp_changed=None,
     on_tick=None,
-    slider_range=(-0.5, 0.5),  # end-effector 조작 범위(단위: m)
+    slider_range=(-0.2, 0.2),  # end-effector 조작 범위(단위: m)
     # 0.2: 안정권, 0.5 미세한 변화에도 매우 민감
     # grasp panel에는 alpha의 범위 (0.0, 1.0)를 전달
 ):
@@ -64,9 +65,7 @@ def run_target_window(
     scene.scene.add_geometry("axes", axes, material)
 
     hand_pose_panel = TargetPanel(
-        initial_target
-        if initial_target is not None
-        else target_position(robot_geometries),
+        initial_target if initial_target is not None else target_position(robot_geometries),
         on_target_changed=handle_target_changed,
         slider_range=slider_range,
     )
@@ -104,11 +103,19 @@ def run_target_window(
     def handle_tick():
         if on_tick is None:
             return False
-        changed = (
-            on_tick()
-        )  # GUI가 매 프레임마다 자동으로 호출하는 콜백함수 (open3d 제공)
+
+        tick_result = on_tick()  # GUI가 매 프레임마다 자동으로 호출하는 콜백함수 (open3d 제공)
+
+        if isinstance(tick_result, np.ndarray):
+            hand_pose_panel.set_target(tick_result, notify=False, reset_base=False)
+            refresh_robot_geometries()
+            return True
+
+        changed = tick_result
+
         if changed:
             refresh_robot_geometries()
+
         return bool(changed)
 
     window.set_on_tick_event(handle_tick)

@@ -1,101 +1,117 @@
 # sphere - sphere
 # sphere - capsule
 # capsule - capsule
-# box - cylinder
+# box - capsule
 
 
 import numpy as np
 import open3d as o3d
-from sim.model.collision.proxy import make_cylinder_proxy
+import fcl
+from scipy.spatial.transform import Rotation
+from sim.model.collision.proxy import (
+    BoxProxy,
+    make_box_proxy,
+    CapsuleProxy,
+    make_capsule_proxy,
+)
 from sim.model.robot.geometry import GeomRecord
 
 
-def use_cylinder_proxy(record: GeomRecord):
+# capsule proxy를 사용하지 않는 개체는 mesh 그대로 반환하도록 함
+def use_capsule_proxy(record: GeomRecord):
     return record.body_name not in {"world", "base_table"}
 
 
-def cylinder_proxy_mesh(record: GeomRecord):
-    bbox = record.mesh.get_oriented_bounding_box()
-    extent = np.asarray(bbox.extent, dtype=float)
-    long_axis = int(np.argmax(extent))
-    short_axes = [i for i in range(3) if i != long_axis]
+def get_proxy(record: GeomRecord, proxy_cache=None):
+    if proxy_cache is not None and record.geom_id in proxy_cache:
+        return proxy_cache[record.geom_id]
 
-    height = float(extent[long_axis])
-    radius = 0.5 * float(max(extent[short_axes[0]], extent[short_axes[1]]))
-    if height <= 0.0 or radius <= 0.0:
-        return record.mesh
+    if record.body_name == "base_table":
+        proxy = make_box_proxy(record)
+    elif use_capsule_proxy(record):
+        proxy = make_capsule_proxy(record)
+    else:
+        proxy = record.mesh
 
-    cylinder = o3d.geometry.TriangleMesh.create_cylinder(
-        radius=radius,
-        height=height,
-        resolution=16,
+    if proxy_cache is not None:
+        proxy_cache[record.geom_id] = proxy
+
+    return proxy
+
+
+# fcl 인스턴스의 z축을 proxy 축으로 변환하는 회전행렬을 생성
+def make_align_rotation_matrix(axis):
+    z = np.array([0.0, 0.0, 1.0])
+    axis = axis / np.linalg.norm(axis)
+    return Rotation.align_vectors([axis], [z])[0].as_matrix()
+
+
+def capsule_to_fcl(capsule: CapsuleProxy):
+    axis = capsule.p1 - capsule.p0
+    length = np.linalg.norm(axis)
+    center = 0.5 * (capsule.p0 + capsule.p1)
+
+    if length < 1e-8:  # fallback
+        geom = fcl.Sphere(capsule.radius)
+        tf = fcl.Transform(np.eye(3), center)
+        return fcl.CollisionObject(geom, tf)
+
+    R = make_align_rotation_matrix(axis)
+    geom = fcl.Capsule(capsule.radius, length)
+    tf = fcl.Transform(R, center)
+
+    return fcl.CollisionObject(geom, tf)
+
+
+def box_to_fcl(box: BoxProxy):
+    size = 2.0 * box.half_extents
+
+    geom = fcl.Box(size[0], size[1], size[2])
+    tf = fcl.Transform(box.axes, box.center)
+
+    return fcl.CollisionObject(geom, tf)
+
+
+def distance_capsule_capsule(capsule_a, capsule_b):
+    request = fcl.DistanceRequest(enable_nearest_points=True, enable_signed_distance=True)
+    result = fcl.DistanceResult()
+    distance = fcl.distance(
+        capsule_to_fcl(capsule_a),
+        capsule_to_fcl(capsule_b),
+        request,
+        result,
     )
 
-    z_axis = bbox.R[:, long_axis]
-    x_axis = bbox.R[:, short_axes[0]]
-    x_axis = x_axis - z_axis * np.dot(z_axis, x_axis)
-    if np.linalg.norm(x_axis) < 1e-8:
-        x_axis = bbox.R[:, short_axes[1]]
-        x_axis = x_axis - z_axis * np.dot(z_axis, x_axis)
-
-    x_axis = x_axis / np.linalg.norm(x_axis)
-    y_axis = np.cross(z_axis, x_axis)
-    y_axis = y_axis / np.linalg.norm(y_axis)
-
-    R = np.column_stack([x_axis, y_axis, z_axis])
-    cylinder.rotate(R, center=(0, 0, 0))
-    cylinder.translate(bbox.center)
-    cylinder.compute_vertex_normals()
-
-    return cylinder
+    return result.nearest_points[0], result.nearest_points[1], float(distance)
 
 
-def distance_mesh(record: GeomRecord, proxy_cache=None):
-    if not use_cylinder_proxy(record):
-        return record.mesh
+def distance_capsule_box(capsule, box):
+    request = fcl.DistanceRequest(enable_nearest_points=True, enable_signed_distance=True)
+    result = fcl.DistanceResult()
+    distance = fcl.distance(
+        capsule_to_fcl(capsule),
+        box_to_fcl(box),
+        request,
+        result,
+    )
 
-    if proxy_cache is None:
-        return make_cylinder_proxy(None, None, [record])[0].mesh
-
-    if record.geom_id not in proxy_cache:
-        proxy_cache[record.geom_id] = make_cylinder_proxy(None, None, [record])[0].mesh
-
-    return proxy_cache[record.geom_id]
+    return result.nearest_points[0], result.nearest_points[1], float(distance)
 
 
 # 두 프록시 사이 최소 거리와 최소 거리를 만드는 두 위치 반환
-def proxy_distance(r1: GeomRecord, r2: GeomRecord, proxy_cache=None):
-    mesh1 = distance_mesh(r1, proxy_cache)
-    mesh2 = distance_mesh(r2, proxy_cache)
+# 부호 없는 거리 측도도 괜찮은가?->관통 깊이 계산을 위해 상대 거리를 반환해야 함
+def proxy_distance(record1: GeomRecord, record2: GeomRecord, proxy_cache=None):
+    proxy1 = get_proxy(record1, proxy_cache)
+    proxy2 = get_proxy(record2, proxy_cache)
 
-    # open3d pointcloud 클래스를 이용해 프록시 위 점들을 샘플링하고, 거리를 계산
-    if proxy_cache is None:
-        pointcloud1 = mesh1.sample_points_uniformly(number_of_points=50)  # pointcloud 객체
-        pointcloud2 = mesh2.sample_points_uniformly(number_of_points=50)
+    if isinstance(proxy1, CapsuleProxy) and isinstance(proxy2, CapsuleProxy):
+        return distance_capsule_capsule(proxy1, proxy2)
 
-        points1 = np.asarray(pointcloud1.points)  # pointcloud를 이루는 점들의 위치 배열
-        points2 = np.asarray(pointcloud2.points)
-    else:
-        points_key1 = ("points", r1.geom_id)
-        points_key2 = ("points", r2.geom_id)
+    if isinstance(proxy1, CapsuleProxy) and isinstance(proxy2, BoxProxy):
+        return distance_capsule_box(proxy1, proxy2)
 
-        if points_key1 not in proxy_cache:
-            pointcloud1 = mesh1.sample_points_uniformly(number_of_points=50)
-            proxy_cache[points_key1] = np.asarray(pointcloud1.points).copy()
-        if points_key2 not in proxy_cache:
-            pointcloud2 = mesh2.sample_points_uniformly(number_of_points=50)
-            proxy_cache[points_key2] = np.asarray(pointcloud2.points).copy()
+    if isinstance(proxy1, BoxProxy) and isinstance(proxy2, CapsuleProxy):
+        point_b, point_a, distance = distance_capsule_box(proxy2, proxy1)
+        return point_a, point_b, distance
 
-        points1 = proxy_cache[points_key1]
-        points2 = proxy_cache[points_key2]
-
-    distance_vectors = points1[:, None, :] - points2[None, :, :]
-    squared_distances = np.sum(distance_vectors * distance_vectors, axis=2)
-    i, j = np.unravel_index(np.argmin(squared_distances), squared_distances.shape)
-
-    return points1[i], points2[j], float(np.sqrt(squared_distances[i, j]))
-
-    # distance_12 = pointcloud1.compute_point_cloud_distance(pointcloud2)
-    # distance_21 = pointcloud2.compute_point_cloud_distance(pointcloud1)
-
-    # return min(min(distance_12), min(distance_21))
+    return None
