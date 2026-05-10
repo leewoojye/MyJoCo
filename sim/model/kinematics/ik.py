@@ -2,7 +2,7 @@ import stat
 
 import numpy as np
 import scipy
-from sim.model.kinematics.fk import compute_fk, apply_fk
+from sim.model.kinematics.fk import compute_fk
 from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
 from sim.model.math3d.rotation import omega2rotation_matrix
 from sim.model.math3d.transform import create_transform_matrix
@@ -20,6 +20,21 @@ from sim.model.kinematics.jacobian import (
 def damped_pseudoinverse(J, lambda_=1e-3):  # 예약어 충돌방지를 위한 언더바
     m = J.shape[0]
     return J.T @ np.linalg.inv(J @ J.T + lambda_**2 * np.eye(m))
+
+
+# 관절각 제약을 고려해 클리핑
+def clamp_joint_ranges(qpos, joints):
+    clipped_qpos = qpos.copy()
+
+    for joint in joints:
+        if not joint.get("limited", False):
+            continue
+
+        qpos_addr = joint["qpos_addr"]
+        lower, upper = joint["range"]
+        clipped_qpos[qpos_addr] = np.clip(clipped_qpos[qpos_addr], lower, upper)
+
+    return clipped_qpos
 
 
 # 현재 e.e와 목표 간 twist error 계산
@@ -54,7 +69,7 @@ def calculate_twist_error(T_sb, T_sd):
     return V_b_mat, V_b
 
 
-def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target_pos, M, target_body="hx5_r_base"):
+def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target_pos, M, target_body="arm_r_link7"):
     # M: home configuration, 관절각이 0일 때 모든 링크의 T 집합
     # home_qpos = np.zeros(
     #     len(state.qpos),
@@ -89,6 +104,8 @@ def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target
         for joint, dq_i in zip(joints, dq):
             theta[joint["qpos_addr"]] += dq_i
 
+        theta = clamp_joint_ranges(theta, joints)
+
         # e가 벡터일 경우 불린 배열을 반환하여 조건문이 애매해짐
         # if np.abs(e) <= 1e-4:
         if np.linalg.norm(e) <= 1e-4:
@@ -102,14 +119,15 @@ def solve_newton_raphson_coordinate(robot: RobotModel, state: RobotState, target
     max_theta_step = 0.1
     delta_theta = theta - theta_prev
     delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
-    state.qpos = theta_prev + delta_theta
+    # state.qpos = theta_prev + delta_theta
+    state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
     # state.qpos = theta
 
     return state
 
 
 def solve_newton_raphson_geometric(
-    robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="hx5_r_base"
+    robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"
 ):  # target_body->end-effector 인스턴스 수정예정
     T_sb = robot.body_node_for(target_body).world_transform
     T_sd = T_sb.copy()
@@ -142,6 +160,8 @@ def solve_newton_raphson_geometric(
         for joint, dq_i in zip(joints, dq):
             theta[joint["qpos_addr"]] += dq_i
 
+        theta = clamp_joint_ranges(theta, joints)
+
         if np.linalg.norm(twist_error) <= 1e-4:
             break
         if iter > 100:
@@ -153,12 +173,13 @@ def solve_newton_raphson_geometric(
     max_theta_step = 0.1
     delta_theta = theta - theta_prev
     delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
-    state.qpos = theta_prev + delta_theta
+    # state.qpos = theta_prev + delta_theta
+    state.qpos = clamp_joint_ranges(theta_prev + delta_theta, joints)
 
     return state
 
 
-def solve_position_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="hx5_r_base"):
+def solve_position_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"):
     new_state = solve_newton_raphson_coordinate(robot, state, target_pos, home_pose, target_body)
     return new_state
 
@@ -170,20 +191,24 @@ def solve_position_ik(robot: RobotModel, state: RobotState, target_pos, home_pos
 
 # position + pose (6D twist) 기반 자코비안 행렬 활용
 # target_pos(3,): input position
-def solve_pose_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="hx5_r_base"):
+def solve_pose_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, target_body="arm_r_link7"):
     new_state = solve_newton_raphson_geometric(robot, state, target_pos, home_pose, target_body)
 
     return new_state
 
 
-# 계산된 관절각 적용
-# right hand는 geometric ik, left hand는 pose ik 적용
-def apply_ik(robot: RobotModel, state: RobotState, target_pos, home_pose, mode="position"):
+# IK로 state의 qpos만 갱신함. FK/mesh 갱신은 호출부에서 확정된 state에 대해 수행.
+def apply_ik(
+    robot: RobotModel,
+    state: RobotState,
+    target_pos,
+    home_pose,
+    mode="position",
+    target_body="arm_r_link7",
+):
     if mode == "position":
-        new_state = solve_position_ik(robot, state, target_pos, home_pose)
+        new_state = solve_position_ik(robot, state, target_pos, home_pose, target_body)
     elif mode == "pose":
-        new_state = solve_pose_ik(robot, state, target_pos, home_pose)
+        new_state = solve_pose_ik(robot, state, target_pos, home_pose, target_body)
 
-    robot = apply_fk(robot, new_state, home_pose)
-
-    return robot
+    return new_state

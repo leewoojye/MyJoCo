@@ -7,7 +7,7 @@ from sim.view.gui.grasp_panel import GraspPanel
 
 
 def target_position(robot_geometries):
-    r_hand = robot_geometries.body_node_for("hx5_r_base")
+    r_hand = robot_geometries.body_node_for("arm_r_link7")
     if r_hand is None:
         raise ValueError("r_hand body node not found")
     return r_hand.world_transform[:3, 3]

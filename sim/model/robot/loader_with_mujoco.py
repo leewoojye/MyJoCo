@@ -16,8 +16,8 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "scene_ffw_sh5.xml"
 
 END_EFFECTOR_BODIES = {
-    "left_hand": "hx5_l_base",
-    "right_hand": "hx5_r_base",
+    "left_hand": "arm_l_link7",
+    "right_hand": "arm_r_link7",
     # "left_thumb_tip": "finger_l_link4",
     # "left_index_tip": "finger_l_link8",
     # "left_middle_tip": "finger_l_link12",
@@ -111,9 +111,7 @@ def create_open3d_geometry_from_geom(model, data, geom_id):
         geometry = create_floor_from_mujoco_plane(model, geom_id)
     elif geom_type == mujoco.mjtGeom.mjGEOM_BOX:
         size = model.geom_size[geom_id]
-        geometry = o3d.geometry.TriangleMesh.create_box(
-            width=2 * size[0], height=2 * size[1], depth=2 * size[2]
-        )
+        geometry = o3d.geometry.TriangleMesh.create_box(width=2 * size[0], height=2 * size[1], depth=2 * size[2])
         geometry.translate(-size)
         geometry.paint_uniform_color(model.geom_rgba[geom_id][:3])
         geometry.compute_vertex_normals()
@@ -184,8 +182,7 @@ def build_body_nodes(model, data):
         joint_num = int(model.body_jntnum[body_id])
         if joint_addr >= 0 and joint_num > 0:
             node.joints = [
-                create_joint_record(model, data, joint_id)
-                for joint_id in range(joint_addr, joint_addr + joint_num)
+                create_joint_record(model, data, joint_id) for joint_id in range(joint_addr, joint_addr + joint_num)
             ]
 
         body_nodes[body_id] = node

@@ -3,18 +3,9 @@ import scipy
 from typing import Tuple
 from sim.model.collision.distance import distance_mesh, proxy_distance
 from sim.model.grasping.contact import ContactPoint
-from sim.model.kinematics.fk import compute_fk, apply_fk
-from sim.model.kinematics.ik import apply_ik
-from sim.model.math3d.screw import unit_screw_axis, screw_hat, screw_vee
-from sim.model.math3d.rotation import omega2rotation_matrix
-from sim.model.math3d.transform import create_transform_matrix
+from sim.model.kinematics.fk import apply_fk
 from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
-from sim.model.math3d.lie import Adjoint
-from sim.model.kinematics.jacobian import (
-    compute_position_jacobian,
-    compute_geometric_jacobian,
-)
 
 
 def collect_collision_records(robot: RobotModel):
@@ -32,10 +23,24 @@ def is_adjacent(robot: RobotModel, body_id1, body_id2):
     return node1.parent is node2 or node2.parent is node1
 
 
-def is_bbox_overlapping(bbox_a, bbox_b):
-    return np.all(bbox_a.min_bound <= bbox_b.max_bound) and np.all(
-        bbox_b.min_bound <= bbox_a.max_bound
+def is_bbox_overlapping(bbox_a, bbox_b, margin=0.0):
+    return np.all(bbox_a.min_bound - margin <= bbox_b.max_bound) and np.all(
+        bbox_b.min_bound - margin <= bbox_a.max_bound
     )
+
+
+def is_right_hand_body(body_name):
+    return body_name in {"arm_r_link7", "hx5_r_base"} or body_name.startswith(
+        "finger_r_link"
+    )
+
+
+# collision pair 조합 범위를 제한 (ex. 손가락-물체만)
+def should_check_collision_pair(record_a, record_b):
+    body_names = {record_a.body_name, record_b.body_name}
+    has_right_hand = any(is_right_hand_body(body_name) for body_name in body_names)
+
+    return has_right_hand and ("pr_cokeCan" in body_names or "base_table" in body_names)
 
 
 # 가능한 접촉/충돌 후보 쌍들을 반환
@@ -70,6 +75,7 @@ def collision_check(
         frozenset({"base_table", "pr_cokeCan"}),
         frozenset({"world", "base_table"}),
     }
+    # 캐싱 딕셔너리: 계산한 결과를 저장했다가 재사용함
     proxy_cache = {}
     apply_fk(robot, state, M)
 
@@ -78,28 +84,49 @@ def collision_check(
         if frozenset({r_a.body_name, r_b.body_name}) in ignored_pairs:
             continue
 
-        # 이미 거리가 너무 가까운 손가락 마디는 충돌 페어에서 제외
-        if "finger_" in r_a.body_name and "finger_" in r_b.body_name:
+        # 기존 전체 collision pair 검사 대신, 현재는 오른손-캔/오른손-테이블만 검사함
+        if not should_check_collision_pair(r_a, r_b):
             continue
 
-        if (
-            (r_a.body_name == "hx5_l_base" and "finger_l_" in r_b.body_name)
-            or (r_b.body_name == "hx5_l_base" and "finger_l_" in r_a.body_name)
-            or (r_a.body_name == "hx5_r_base" and "finger_r_" in r_b.body_name)
-            or (r_b.body_name == "hx5_r_base" and "finger_r_" in r_a.body_name)
-        ):
-            continue
+        # 이미 거리가 너무 가까운 손가락 마디는 충돌 페어에서 제외
+        # if "finger_" in r_a.body_name and "finger_" in r_b.body_name:
+        #     continue
+
+        # if (
+        #     (r_a.body_name == "arm_l_link7" and "finger_l_" in r_b.body_name)
+        #     or (r_b.body_name == "arm_l_link7" and "finger_l_" in r_a.body_name)
+        #     or (r_a.body_name == "arm_l_link7" and "finger_r_" in r_b.body_name)
+        #     or (r_b.body_name == "arm_l_link7" and "finger_r_" in r_a.body_name)
+        # ):
+        #     continue
+
+        bbox_key_a = ("bbox", r_a.geom_id)
+        bbox_key_b = ("bbox", r_b.geom_id)
+
+        if bbox_key_a not in proxy_cache:
+            proxy_cache[bbox_key_a] = distance_mesh(
+                r_a,
+                proxy_cache,
+            ).get_axis_aligned_bounding_box()
+        if bbox_key_b not in proxy_cache:
+            proxy_cache[bbox_key_b] = distance_mesh(
+                r_b,
+                proxy_cache,
+            ).get_axis_aligned_bounding_box()
+
+        bbox_a = proxy_cache[bbox_key_a]
+        bbox_b = proxy_cache[bbox_key_b]
 
         if "base_table" in {r_a.body_name, r_b.body_name}:
-            bbox_a = distance_mesh(r_a, proxy_cache).get_axis_aligned_bounding_box()
-            bbox_b = distance_mesh(r_b, proxy_cache).get_axis_aligned_bounding_box()
-
             if is_bbox_overlapping(bbox_a, bbox_b):
                 state.qpos[:] = candidate_qpos
                 robot.state.qpos[:] = old_qpos
                 apply_fk(robot, robot.state, M)
-                
+
                 return True, False, None
+
+        if not is_bbox_overlapping(bbox_a, bbox_b, margin=0.02):
+            continue
 
         p_a, p_b, d = proxy_distance(r_a, r_b, proxy_cache)
 

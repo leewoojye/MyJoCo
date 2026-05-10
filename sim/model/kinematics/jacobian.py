@@ -36,7 +36,7 @@ def append_joints(
 # omy의 e.e를 position jacobian으로 다루기
 # IK 과정에서 중간 계산 결과를 활용할 수 있도록 link_poses 인자를 받게 함
 def compute_position_jacobian(
-    robot: RobotModel, link_poses=None, target_body="hx5_r_base"
+    robot: RobotModel, link_poses=None, target_body="arm_r_link7"
 ):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)
@@ -81,7 +81,7 @@ def compute_position_jacobian(
 
 # end-effector(ex. omy의 link6)에 대한 자코비안 행렬 생성
 def compute_geometric_jacobian(
-    robot: RobotModel, link_poses=None, target_body="hx5_r_base"
+    robot: RobotModel, link_poses=None, target_body="arm_r_link7"
 ):
     # end-effector 하드코딩, e.e 시작으로 역으로 관절 순회
     target = robot.body_node_for(target_body)

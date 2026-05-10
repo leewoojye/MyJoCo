@@ -69,11 +69,25 @@ def proxy_distance(r1: GeomRecord, r2: GeomRecord, proxy_cache=None):
     mesh2 = distance_mesh(r2, proxy_cache)
 
     # open3d pointcloud 클래스를 이용해 프록시 위 점들을 샘플링하고, 거리를 계산
-    pointcloud1 = mesh1.sample_points_uniformly(number_of_points=50)  # pointcloud 객체
-    pointcloud2 = mesh2.sample_points_uniformly(number_of_points=50)
+    if proxy_cache is None:
+        pointcloud1 = mesh1.sample_points_uniformly(number_of_points=50)  # pointcloud 객체
+        pointcloud2 = mesh2.sample_points_uniformly(number_of_points=50)
 
-    points1 = np.asarray(pointcloud1.points)  # pointcloud를 이루는 점들의 위치 배열
-    points2 = np.asarray(pointcloud2.points)
+        points1 = np.asarray(pointcloud1.points)  # pointcloud를 이루는 점들의 위치 배열
+        points2 = np.asarray(pointcloud2.points)
+    else:
+        points_key1 = ("points", r1.geom_id)
+        points_key2 = ("points", r2.geom_id)
+
+        if points_key1 not in proxy_cache:
+            pointcloud1 = mesh1.sample_points_uniformly(number_of_points=50)
+            proxy_cache[points_key1] = np.asarray(pointcloud1.points).copy()
+        if points_key2 not in proxy_cache:
+            pointcloud2 = mesh2.sample_points_uniformly(number_of_points=50)
+            proxy_cache[points_key2] = np.asarray(pointcloud2.points).copy()
+
+        points1 = proxy_cache[points_key1]
+        points2 = proxy_cache[points_key2]
 
     distance_vectors = points1[:, None, :] - points2[None, :, :]
     squared_distances = np.sum(distance_vectors * distance_vectors, axis=2)
