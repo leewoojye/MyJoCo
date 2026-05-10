@@ -73,16 +73,48 @@ def box_to_fcl(box: BoxProxy):
 
 
 def distance_capsule_capsule(capsule_a, capsule_b):
+    obj_a = capsule_to_fcl(capsule_a)
+    obj_b = capsule_to_fcl(capsule_b)
     request = fcl.DistanceRequest(enable_nearest_points=True, enable_signed_distance=True)
     result = fcl.DistanceResult()
     distance = fcl.distance(
-        capsule_to_fcl(capsule_a),
-        capsule_to_fcl(capsule_b),
+        obj_a,
+        obj_b,
         request,
         result,
     )
+    p_a = result.nearest_points[0]
+    p_b = result.nearest_points[1]
+    normal = None
 
-    return result.nearest_points[0], result.nearest_points[1], float(distance)
+    if distance > 0:
+        normal = p_b - p_a
+        normal_norm = np.linalg.norm(normal)
+        if normal_norm > 1e-8:
+            normal = normal / normal_norm
+    else:  # 접촉 상태가 관통으로 판단되면 fcl.CollisionResult()로 normal vector를 받아옴
+        collision_request = fcl.CollisionRequest(enable_contact=True, num_max_contacts=1)
+        collision_result = fcl.CollisionResult()
+        fcl.collide(obj_a, obj_b, collision_request, collision_result)
+
+        if collision_result.contacts:
+            contact = collision_result.contacts[0]
+            normal = np.asarray(contact.normal, dtype=float)
+            normal_norm = np.linalg.norm(normal)
+            if normal_norm > 1e-8:
+                normal = normal / normal_norm
+                depth = float(contact.penetration_depth)
+                point = np.asarray(contact.pos, dtype=float)
+                p_a = point - 0.5 * depth * normal
+                p_b = point + 0.5 * depth * normal
+                distance = -depth
+
+    # if normal is None or np.linalg.norm(normal) <= 1e-8:
+    #     normal = 0.5 * (capsule_b.p0 + capsule_b.p1) - 0.5 * (capsule_a.p0 + capsule_a.p1)
+    #     normal_norm = np.linalg.norm(normal)
+    #     normal = normal / normal_norm if normal_norm > 1e-8 else None
+
+    return p_a, p_b, float(distance), normal
 
 
 def distance_capsule_box(capsule, box):

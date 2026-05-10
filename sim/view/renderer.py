@@ -54,9 +54,9 @@ def run_target_window(
             on_target_changed(target_pos)
         # refresh_robot_geometries()
 
-    def handle_grasp_changed(alpha, isThumb):
+    def handle_grasp_changed(alpha, is_thumb):
         if on_grasp_changed is not None:
-            on_grasp_changed(alpha, isThumb)
+            on_grasp_changed(alpha, is_thumb)
         # refresh_robot_geometries()
 
     add_robot_geometries()

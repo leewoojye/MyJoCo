@@ -1,0 +1,12 @@
+<mujocoinclude>
+
+    <worldbody>
+    <!-- ffw_sh5 앞에 놓일 탁자 위치 설정 -->
+        <body name="base_table" pos="0.88 0 0.0" euler="0 0 0">
+        <!-- mesh(obj)파일 대신 mujoco 내장 기본 도형 box 사용 -->
+            <geom name="base_table" size="0.38 0.36 0.395" pos="0 0 0.395" type="box" rgba="0.420 0.353 0.325 1.0"/>
+            <inertial pos="0 0 0" mass="1" diaginertia="0 0 0" />
+        </body>
+    </worldbody>
+
+</mujocoinclude>

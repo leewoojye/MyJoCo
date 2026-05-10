@@ -7,17 +7,14 @@ import open3d.visualization.gui as gui
 class GraspPanel:
     def __init__(
         self,
-        # 초기 alpha와 엄지 여부를 나타내는 변수
         initial_grasp,
-        isThumb=False,
-        # alpha(np.ndarray), isThumb(bool)을 입력으로 받음
+        # alpha(np.ndarray), is_thumb(bool)을 입력으로 받음
         on_grasp_changed: Callable[[np.ndarray, bool], None] | None = None,
         slider_range=(0.0, 1.0),
     ):
         self.base_alpha = np.asarray(initial_grasp, dtype=float).reshape(2).copy()
         self.offset = np.zeros(2)
         self.alpha = self.base_alpha.copy()
-        self.isThumb = isThumb
         self.on_grasp_changed = on_grasp_changed
         self.widget = gui.Vert(6, gui.Margins(8, 8, 8, 8))
         self._sliders = []
@@ -48,22 +45,21 @@ class GraspPanel:
     def _set_axis(self, index, value):
         self.offset[index] = float(value)
         self.alpha = self.base_alpha + self.offset
-        self.isThumb = index == 0  # 패널에서 첫 인덱스는 thumb을 조종함
+        is_thumb = index == 0  # 패널에서 첫 인덱스는 thumb을 조종함
         self._value_labels[index].text = f"{value:.3f}"
         if self.on_grasp_changed is not None:  # 움직이면 있으면 callback 함수를 호출
-            self.on_grasp_changed(self.alpha.copy(), self.isThumb)
+            self.on_grasp_changed(self.alpha.copy(), is_thumb)
 
-    def set_target(self, target_alpha, isThumb, notify=False):
+    def set_target(self, target_alpha, is_thumb, notify=False):
         self.base_alpha[:] = np.asarray(target_alpha, dtype=float).reshape(2)
         self.offset[:] = 0.0
         self.alpha = self.base_alpha.copy()
-        self.isThumb = isThumb
         for index, slider in enumerate(self._sliders):
             slider.double_value = 0.0
             self._value_labels[index].text = "0.000"
 
         if notify and self.on_grasp_changed is not None:
-            self.on_grasp_changed(self.alpha.copy(), self.isThumb)
+            self.on_grasp_changed(self.alpha.copy(), is_thumb)
 
     # def __init__(self, on_grasp_changed: Callable | None = None):
     #     pass

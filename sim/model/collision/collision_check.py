@@ -97,11 +97,16 @@ def check_collision(
         # ):
         #     continue
 
-        p_a, p_b, d = proxy_distance(r_a, r_b, proxy_cache)
+        distance_result = proxy_distance(r_a, r_b, proxy_cache)
+        if len(distance_result) == 4:
+            p_a, p_b, d, normal = distance_result
+        else:
+            p_a, p_b, d = distance_result
+            normal = contact_normal(p_a, p_b)
         body_names = {r_a.body_name, r_b.body_name}
 
         # 손이 물체를 관통하는 상황은 충돌보다 접촉에 가까운 것으로 보고,
-        if "pr_cokeCan" in body_names and d <= 0.005:
+        if "pr_cokeCan" in body_names and d <= 0.01:
             is_contact = True
 
             if return_contacts:
@@ -112,7 +117,7 @@ def check_collision(
                         point=0.5 * (p_a + p_b),
                         p_a=p_a,
                         p_b=p_b,
-                        normal=contact_normal(p_a, p_b),
+                        normal=normal,
                         distance=d,
                         depth=max(0.0, -d),  # penetration depth
                         V_a=state.body_twists.get(r_a.body_name, np.zeros(6)),

@@ -5,11 +5,11 @@ from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
 
 
-def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
+def compute_grasp(robot: RobotModel, state: RobotState, alpha, is_thumb):
     # q = (1 - grasp) q_open + grasp q_closed
     q_open = 0
 
-    if isThumb:  # 엄지 마디와 연결된 관절들 업데이트
+    if is_thumb:  # 엄지 마디와 연결된 관절들 업데이트
         # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
         # 엄지 자세 q를 배열로 하드코딩
         q_open_list = [0.3, -1.57, 0.35, 0.25]
@@ -31,8 +31,8 @@ def calculate_grasp(robot: RobotModel, state: RobotState, alpha, isThumb):
     return state
 
 
-def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, isThumb=False):
-    state = calculate_grasp(robot, state, alpha, isThumb)
+def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, is_thumb=False):
+    state = compute_grasp(robot, state, alpha, is_thumb)
     robot = apply_fk(robot, state, M)
 
     return robot
@@ -44,7 +44,7 @@ def check_form_closure(contact_points):
     # 조건0: positive span이 공간 전체를 덮어야 해 최소 7개의 접촉점을 가져야함 (공간 기준)
     if len(contact_points) < 7:
         return False
-    
+
     wrenches = [
         force_to_wrench(contact.point, contact.normal) for contact in contact_points if contact.normal is not None
     ]

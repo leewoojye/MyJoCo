@@ -47,7 +47,7 @@ def force_to_wrench(pos, force):
 # 접선 방향: friction force
 def sum_contact_force(
     contact_points,
-    normal_force=0.5,  # 법선 힘의 크기를 호출부에서 받는 형태
+    normal_force=1.0,  # 법선 힘의 크기를 호출부에서 받는 형태
     friction_coefficient=0.2,
 ):
     sum_force = np.zeros(3)
@@ -96,7 +96,7 @@ def apply_body_translation(robot, body_name, displacement):
     joint = body_node.joints[0]
     addr = joint["qpos_addr"]
 
-    # qvel update는 tick/controller에서 실제 적용된 qpos 차분과 dt로 처리한다.
+    # qvel update는 tick/controller에서 실제 적용된 qpos 차분과 dt로 처리
     robot.state.qpos[addr : addr + 3] += displacement
 
     delta = np.eye(4)

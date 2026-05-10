@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import linprog
 from sim.model.grasping.contact_constraint import force_to_wrench
+from sim.model.grasping.form_closure import check_form_closure
 
 
 def check_force_closure():
@@ -73,5 +74,8 @@ def solve_contact_forces(contact_points, external_wrench, friction_coefficient):
     return True, edge_weights
 
 
-def evaluate_grasp_hold(contact_points, external_wrench, friction_coefficient):
+def evaluate_grasp_state(contact_points, external_wrench, friction_coefficient):
+    if check_form_closure(contact_points):
+        return True, None
+
     return solve_contact_forces(contact_points, external_wrench, friction_coefficient)

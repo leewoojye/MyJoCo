@@ -13,7 +13,7 @@ from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-XML_PATH = ROOT_DIR / "robotis_mujoco_menagerie" / "robotis_ffw" / "scene_ffw_sh5.xml"
+XML_PATH = ROOT_DIR / "assets" / "robots" / "robotis_ffw" / "scene_ffw_sh5.xml"
 
 END_EFFECTOR_BODIES = {
     "left_hand": "arm_l_link7",
