@@ -12,8 +12,10 @@ def compute_grasp(robot: RobotModel, state: RobotState, alpha, is_thumb):
     if is_thumb:  # 엄지 마디와 연결된 관절들 업데이트
         # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
         # 엄지 자세 q를 배열로 하드코딩
+        # q_open_list = [0.3, -1.57, 0.35, 0.25]
+        # q_closed_list = [0.4, -1.57, 0.8, 0.7]
         q_open_list = [0.3, -1.57, 0.35, 0.25]
-        q_closed_list = [0.4, -1.57, 0.8, 0.7]
+        q_closed_list = [0.4, -1.25, 0.8, 0.7]
 
         for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
             finger_node = robot.body_node_for(f"finger_r_link{i}")

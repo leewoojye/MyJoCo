@@ -1,0 +1,15 @@
+<mujoco model="ycb_master_chef_can">
+
+  <asset>
+    <material name="master_chef_can" rgba="0.85 0.08 0.03 1" specular="0.5" shininess="0.5"/>
+    <mesh name="master_chef_can" file="../../../objects/ycb/002_master_chef_can/master_chef_can.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="pr_cokeCan" pos="0.70 0 0.78995" quat="1 0 0 0">
+      <freejoint/>
+      <geom name="master_chef_can_visual" material="master_chef_can" mesh="master_chef_can" class="visual"/>
+      <geom name="master_chef_can_collision" mesh="master_chef_can" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

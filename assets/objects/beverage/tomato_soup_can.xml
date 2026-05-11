@@ -1,0 +1,15 @@
+<mujoco model="ycb_tomato_soup_can">
+
+  <asset>
+    <material name="tomato_soup_can" rgba="0.9 0.08 0.03 1" specular="0.5" shininess="0.5"/>
+    <mesh name="tomato_soup_can" file="../../../objects/ycb/005_tomato_soup_can/tomato_soup_can.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="pr_cokeCan" pos="0.70 0 0.78995" quat="1 0 0 0">
+      <freejoint/>
+      <geom name="tomato_soup_can_visual" material="tomato_soup_can" mesh="tomato_soup_can" class="visual"/>
+      <geom name="tomato_soup_can_collision" mesh="tomato_soup_can" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>
