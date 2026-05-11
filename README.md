@@ -7,6 +7,8 @@ This project is a custom robotics simulator for experimenting with a ROBOTIS FFW
 
 The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshes, and runs a kinematics-based interaction loop.
 
+⭐️ Check out the more detailed implementation journey here!⭐️ https://leewoojye.github.io/research/2026/05/02/sim_from_scratch.html
+
 ## How to Use
 
 Create and activate a conda environment:
