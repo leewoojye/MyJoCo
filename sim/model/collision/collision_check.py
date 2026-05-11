@@ -91,6 +91,9 @@ def check_collision(
         else:
             p_a, p_b, d = distance_result
             normal = contact_normal(p_a, p_b)
+        if normal is None:  # normal이 None이면 fallback normal 생성
+            normal = p_b - p_a
+
         body_names = {r_a.body_name, r_b.body_name}
 
         # 손이 물체를 관통하는 상황은 충돌보다 접촉에 가까운 것으로 보고,
