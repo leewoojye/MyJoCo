@@ -45,14 +45,14 @@ def force_to_wrench(pos, force):
 # 토크/회전은 반영하지 못하고 있음 (추후 수정)
 # 법선 방향: normal force
 # 접선 방향: friction force
-def sum_contact_force(
-    contact_points,
+def sum_contact_forces(
+    contacts,
     normal_force=1.0,  # 법선 힘의 크기를 호출부에서 받는 형태
     friction_coefficient=0.2,
 ):
-    sum_force = np.zeros(3)
+    force_sum = np.zeros(3)
 
-    for contact in contact_points:
+    for contact in contacts:
         if contact.normal is None:
             continue
 
@@ -85,28 +85,9 @@ def sum_contact_force(
         # 접촉힘 = 법선힘 + 접선힘
         contact.force = normal_force * normal + friction_force
 
-        sum_force += contact.force  # 문제: 힘 벡터 방향이 서로 비슷할 경우
+        force_sum += contact.force  # 문제: 힘 벡터 방향이 서로 비슷할 경우
 
-    return sum_force
-
-
-# 접촉점의 힘으로 인한 강체의 이동을 표현
-def apply_body_translation(robot, body_name, displacement):
-    body_node = robot.body_node_for(body_name)
-    joint = body_node.joints[0]
-    addr = joint["qpos_addr"]
-
-    # qvel update는 tick/controller에서 실제 적용된 qpos 차분과 dt로 처리
-    robot.state.qpos[addr : addr + 3] += displacement
-
-    delta = np.eye(4)
-    delta[:3, 3] = displacement
-
-    for node in body_node.iter_nodes():
-        for record in node.all_records():
-            record.mesh.transform(delta)
-
-        node.world_transform = delta @ node.world_transform
+    return force_sum
 
 
 # 접촉점 force들을 열벡터로 갖는 matrix를 wrench matrix로 변환

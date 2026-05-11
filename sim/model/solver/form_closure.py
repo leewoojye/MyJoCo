@@ -1,5 +1,5 @@
 import numpy as np
-from sim.model.grasping.contact_constraint import force_to_wrench, has_positive_k
+from sim.model.solver.contact_constraint import force_to_wrench, has_positive_k
 from sim.model.kinematics.fk import compute_fk, apply_fk
 from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState

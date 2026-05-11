@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import linprog
-from sim.model.grasping.contact_constraint import force_to_wrench
-from sim.model.grasping.form_closure import check_form_closure
+from sim.model.solver.contact_constraint import force_to_wrench
+from sim.model.solver.form_closure import check_form_closure
 
 
 def check_force_closure():

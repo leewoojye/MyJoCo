@@ -3,14 +3,18 @@ import open3d as o3d
 import time
 
 from sim.model.collision.collision_check import check_collision
-from sim.model.grasping.contact_constraint import (
-    apply_body_translation,
-    sum_contact_force,
+from sim.model.dynamics.integrator import (
+    apply_translation,
+    integrate_force,
+    update_qvel,
+)
+from sim.model.solver.contact_constraint import (
+    sum_contact_forces,
 )
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
-from sim.model.grasping.force_closure import evaluate_grasp_state
-from sim.model.grasping.form_closure import compute_grasp
+from sim.model.solver.form_closure import compute_grasp
+from sim.model.solver.grasp_solver import object_body_contacts, update_grasp_state
 from sim.model.kinematics.jacobian import compute_body_twist, compute_geometric_jacobian
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import interpolate_position
@@ -138,13 +142,13 @@ def main():
     target_rot = np.zeros(3)  # 주어진 roll, pitch, yaw
 
     # 로봇팔 궤적 관련 변수
+    # trajectory_start_time = None
     trajectory_start = None
     trajectory_goal = None  # 형성된 단일 궤적의 목표
-    # trajectory_start_time = None
     last_tick_time = None
     trajectory_elapsed = 0.0
     trajectory_duration = 0.1  # 단일 궤적 시간 고정
-    object_body_name = "pr_cokeCan"  # 상호작용할 물체 지정 (추후 리펙토링)
+    object_name = "pr_cokeCan"  # 상호작용할 물체 지정 (추후 리펙토링)
     friction_coefficient = (
         0.2  # force closure solver 입장에서는 마찰계수가 커질수록 가능한 접촉 힘 cone이 넓어져서 grasp 성공에 용이
     )
@@ -306,7 +310,7 @@ def main():
         for node in robot.root_body.iter_nodes():
             body_name = node.name
 
-            if body_name == object_body_name:
+            if body_name == object_name:
                 joint = node.joints[0]
                 addr = joint["qpos_addr"]
                 robot.state.body_twists[body_name] = np.r_[np.zeros(3), robot.state.qvel[addr : addr + 3]]
@@ -321,19 +325,15 @@ def main():
 
         if can_grasp:  # 접촉 bodynode에 기반해 캔의 변위 설정
             contact_body_pos = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
-            body_node = robot.body_node_for(object_body_name)
+            body_node = robot.body_node_for(object_name)
             object_pos = body_node.world_transform[:3, 3].copy()
 
             if offset is None:
                 offset = object_pos - contact_body_pos
 
             object_displacement = contact_body_pos + offset - object_pos
-            apply_body_translation(robot, object_body_name, object_displacement)
-
-            if raw_dt > 0:
-                joint = body_node.joints[0]
-                addr = joint["qpos_addr"]
-                robot.state.qvel[addr : addr + 3] = object_displacement / raw_dt
+            apply_translation(robot, object_name, object_displacement)
+            update_qvel(robot, object_name, object_displacement, raw_dt)
 
         contacts = None
         if is_contact or can_grasp:
@@ -344,72 +344,43 @@ def main():
                 return_contacts=True,
             )
 
-        # robot-object 사이 접촉점 순회
-        object_contacts = []
-        for contact in contacts or []:
-            if contact.normal is None:
-                continue
-
-            if contact.record_a.body_name == object_body_name:
-                contact.normal = -contact.normal
-                object_contacts.append(contact)
-            elif contact.record_b.body_name == object_body_name:
-                object_contacts.append(contact)
+        object_contacts = object_body_contacts(contacts, object_name)
 
         # 접촉점에서의 상대속도 계산은 compute_contact_force_sum() 내부에서 수행
 
-        if object_contacts and grasp_changed and not can_grasp:  # grasp panel에 변화가 있을 때만
-            object_mass = dynamics_dict[object_body_name]["mass"]
-            object_center = robot.body_node_for(object_body_name).world_transform[:3, 3]
-            gravity_force = np.array([0.0, 0.0, -object_mass * 9.81])
-            # gravity_force = np.array([0.0, 0.0, 0.0]) # 작은 외력은 closure 임계점을 많이 낮추는 문제
-            gravity_wrench = np.r_[np.cross(object_center, gravity_force), gravity_force]
+        can_grasp, offset = update_grasp_state(
+            robot,
+            object_name,
+            right_target_body,
+            object_contacts,
+            grasp_changed,
+            can_grasp,
+            offset,
+            dynamics_dict[object_name]["mass"],
+            friction_coefficient,
+        )
 
-            next_can_grasp, _ = evaluate_grasp_state(
-                object_contacts,
-                gravity_wrench,
-                friction_coefficient,
-            )
-
-            can_grasp = next_can_grasp
-            if can_grasp:
-                contact_body_pos = robot.body_node_for(right_target_body).world_transform[:3, 3]
-                offset = object_center - contact_body_pos
-            else:
-                offset = None
-        elif grasp_changed and not can_grasp:
-            can_grasp = False
-            offset = None
-        elif not can_grasp:
-            offset = None
-
-        dynamics_dict[object_body_name]["is_grasped"] = can_grasp
+        dynamics_dict[object_name]["is_grasped"] = can_grasp
 
         if object_contacts and not can_grasp:
-            object_force = sum_contact_force(  # 물체에 가해지는 힘 벡터를 합산
-                contact_points=object_contacts,
+            object_force = sum_contact_forces(  # 물체에 가해지는 힘 벡터를 합산
+                contacts=object_contacts,
             )
 
             # 힘 벡터가 테이블과 평행하도록 클리핑 (추후 수정)
             object_force[2] = 0.0
-            force_norm = np.linalg.norm(object_force)
-
-            if force_norm > 0:
-                object_acc = object_force / 0.35  # 가속도를 적분하여 변위 계산
-                # object_vel = object_acc * dt
-                object_displacement = 0.5 * object_acc * physics_dt**2
-                apply_body_translation(robot, object_body_name, object_displacement)
-
-                if physics_dt > 0:
-                    body_node = robot.body_node_for(object_body_name)
-                    joint = body_node.joints[0]
-                    addr = joint["qpos_addr"]
-                    robot.state.qvel[addr : addr + 3] = object_displacement / physics_dt
+            integrate_force(
+                robot,
+                object_name,
+                object_force,
+                dynamics_dict[object_name]["mass"],
+                physics_dt,
+            )
 
         if trajectory_elapsed >= trajectory_duration:
+            # trajectory_start_time = None
             trajectory_start = None
             trajectory_goal = None
-            # trajectory_start_time = None
             target_goal = None
             last_tick_time = None
             trajectory_elapsed = 0.0

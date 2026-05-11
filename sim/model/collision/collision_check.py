@@ -4,7 +4,7 @@ import scipy
 from typing import Tuple
 from sim.model.collision.distance import get_proxy, proxy_distance
 from sim.model.collision.proxy import BoxProxy, CapsuleProxy
-from sim.model.grasping.contact import ContactPoint
+from sim.model.solver.contact import ContactPoint
 from sim.model.kinematics.fk import apply_fk
 from sim.model.math3d.vector import contact_normal
 from sim.model.robot.robot_model import RobotModel
