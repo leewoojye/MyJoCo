@@ -84,7 +84,7 @@ def run_target_window(
 
     def on_layout(_):
         rect = window.content_rect
-        panel_width = min(320, rect.width)
+        panel_width = min(640, rect.width)
         panel_height = rect.height / 2
         scene.frame = gui.Rect(rect.x, rect.y, rect.width - panel_width, rect.height)
         hand_pose_panel.widget.frame = gui.Rect(

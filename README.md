@@ -9,7 +9,14 @@ The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshe
 
 ## How to Use
 
-Install the required Python packages:
+Create and activate a conda environment:
+
+```bash
+conda create -n my_robotics python=3.12
+conda activate my_robotics
+```
+
+Install the required Python packages from the project root:
 
 ```bash
 pip install -r requirements.txt

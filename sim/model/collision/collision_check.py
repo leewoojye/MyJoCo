@@ -85,18 +85,6 @@ def check_collision(
         if not should_check_collision_pair(r_a, r_b):
             continue
 
-        # 이미 거리가 너무 가까운 손가락 마디는 충돌 페어에서 제외
-        # if "finger_" in r_a.body_name and "finger_" in r_b.body_name:
-        #     continue
-
-        # if (
-        #     (r_a.body_name == "arm_l_link7" and "finger_l_" in r_b.body_name)
-        #     or (r_b.body_name == "arm_l_link7" and "finger_l_" in r_a.body_name)
-        #     or (r_a.body_name == "arm_l_link7" and "finger_r_" in r_b.body_name)
-        #     or (r_b.body_name == "arm_l_link7" and "finger_r_" in r_a.body_name)
-        # ):
-        #     continue
-
         distance_result = proxy_distance(r_a, r_b, proxy_cache)
         if len(distance_result) == 4:
             p_a, p_b, d, normal = distance_result
@@ -106,7 +94,7 @@ def check_collision(
         body_names = {r_a.body_name, r_b.body_name}
 
         # 손이 물체를 관통하는 상황은 충돌보다 접촉에 가까운 것으로 보고,
-        if "pr_cokeCan" in body_names and d <= 0.01:
+        if "pr_cokeCan" in body_names and d <= 0.002:
             is_contact = True
 
             if return_contacts:
@@ -131,23 +119,6 @@ def check_collision(
             apply_fk(robot, robot.state, home_pose)  # 이전 상태(robot.state)로 rollback
 
             return True, False, None
-
-        # elif 0.001 < d <= 0.005:  # contact detection
-        #     is_contact = True  # 충돌과 접촉이 공존할 수 있기에 충돌 감지를 먼저 모두 거치고 접촉 여부를 반환하게 함
-
-        #     if return_contacts:
-        #         contact_candidates.append(
-        #             ContactPoint(
-        #                 record_a=r_a,
-        #                 record_b=r_b,
-        #                 point=0.5 * (p_a + p_b),
-        #                 p_a=p_a,
-        #                 p_b=p_b,
-        #                 normal=contact_normal(p_a, p_b),
-        #                 distance=d,
-        #                 depth=max(0.0, -d),
-        #             )
-        #         )
 
     if is_contact:
         state.qpos[:] = candidate_qpos

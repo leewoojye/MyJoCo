@@ -1,0 +1,12 @@
+/robotis_mujoco_menagerie/
+/venv/
+/temp/
+/spot/
+/spots/
+/note.md
+/ffw.md
+.gitignore
+__pycache__/
+*.py[cod]
+.DS_Store
+/sim/model/dynamics/joint_space_dynamics.py

@@ -2,7 +2,7 @@
   <include file="ffw_sh5.xml"/>
   <!-- ffw_sh5 외의 table, can asset 추가 -->
   <include file="../../objects/realworld/base_table_wood.xml"/>
-  <include file="../../objects/beverage/tomato_soup_can.xml"/>
+  <include file="../../objects/beverage/chips_can.xml"/>
 
   <statistic center="0.3 0 0.4" extent="1"/>
 

@@ -1,0 +1,15 @@
+<mujoco model="ycb_chips_can">
+
+  <asset>
+    <material name="chips_can" rgba="0.95 0.18 0.04 1" specular="0.5" shininess="0.5"/>
+    <mesh name="chips_can" file="../../../objects/ycb/001_chips_can/chips_can.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="pr_cokeCan" pos="0.70 0 0.78995" quat="1 0 0 0">
+      <freejoint/>
+      <geom name="chips_can_visual" material="chips_can" mesh="chips_can" class="visual"/>
+      <geom name="chips_can_collision" mesh="chips_can" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

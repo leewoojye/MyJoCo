@@ -109,11 +109,6 @@ def distance_capsule_capsule(capsule_a, capsule_b):
                 p_b = point + 0.5 * depth * normal
                 distance = -depth
 
-    # if normal is None or np.linalg.norm(normal) <= 1e-8:
-    #     normal = 0.5 * (capsule_b.p0 + capsule_b.p1) - 0.5 * (capsule_a.p0 + capsule_a.p1)
-    #     normal_norm = np.linalg.norm(normal)
-    #     normal = normal / normal_norm if normal_norm > 1e-8 else None
-
     return p_a, p_b, float(distance), normal
 
 

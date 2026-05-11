@@ -23,7 +23,7 @@ def compute_fk_all_links_recursive(
             q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
             w = joint_transform[:3, :3] @ joint["axis"]
             S = unit_screw_axis(q, w, 0, joint["type"])
-            theta = state.get(joint["name"])  # PoE에서 세타는 기준 자세로부터 joint displacement (각변위)
+            theta = state.get(joint["name"])  # PoE에서 세타는 기준 자세로부터 joint displacement
 
             # M(home configuration) 성분이 0이 아니면 목표 관절값에서 M만큼 빼줌
             if "_qpos" in home_pose:  # _qpos는 home configuration의 qpos
@@ -64,7 +64,7 @@ def apply_fk(robot: RobotModel, state: RobotState, home_pose):
         old_T = node.world_transform
         new_T = all_link_poses[node.name]
 
-        # (참고) 역행렬: body/frame 좌표계를 바꾸는 효과
+        # (참고) 역행렬: 좌표계를 바꾸는 효과
         # (참고) cancellation
         # new_T = delta @ old_T, delta는 space frame 기준 보정 행렬
         delta = new_T @ np.linalg.inv(old_T)
