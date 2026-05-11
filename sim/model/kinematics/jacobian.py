@@ -110,6 +110,26 @@ def compute_body_twist(robot: RobotModel, state: RobotState, link_poses=None, ta
     return J @ qvel
 
 
+def update_body_twists(robot: RobotModel, state: RobotState, object_body_name):
+    state.body_twists.clear()
+
+    for node in robot.root_body.iter_nodes():
+        body_name = node.name
+
+        if body_name == object_body_name:
+            joint = node.joints[0]
+            addr = joint["qpos_addr"]
+            state.body_twists[body_name] = np.r_[np.zeros(3), state.qvel[addr : addr + 3]]
+        elif body_name in {"world", "base_table"}:
+            state.body_twists[body_name] = np.zeros(6)
+        elif body_name in {"arm_r_link7", "hx5_r_base"} or body_name.startswith("finger_r_link"):
+            state.body_twists[body_name] = compute_body_twist(
+                robot,
+                state,
+                target_body=body_name,
+            )
+
+
 # 특이성 평가
 def manipulability():
     return

@@ -15,7 +15,7 @@ from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
 from sim.model.solver.form_closure import compute_grasp
 from sim.model.solver.grasp_solver import object_body_contacts, update_grasp_state
-from sim.model.kinematics.jacobian import compute_body_twist, compute_geometric_jacobian
+from sim.model.kinematics.jacobian import update_body_twists
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import interpolate_position
 from sim.model.robot.loader_with_mujoco import build_robot_geometries
@@ -184,6 +184,9 @@ def main():
         grasp_goal = np.asarray(alpha, dtype=float).reshape(2)
         grasp_goal_is_thumb = is_thumb
 
+    #####################################
+    # Controller
+    #####################################
     # 패널 감지 콜백함수가 궤적 생성 시점에 관여한다면, tick(유사 clock) 콜백함수가 로봇의 실제 ik 적용과 렌더링을 맡음
     def handle_tick():
         nonlocal \
@@ -270,6 +273,9 @@ def main():
         # v_contact = v_body + w × (p - center) # 회전 고려
         # v_contact = v_body # 회전 무시
 
+        #####################################
+        # Collison check
+        #####################################
         is_collision, is_contact, contacts = check_collision(
             robot,
             candidate_state,
@@ -278,9 +284,9 @@ def main():
         )
 
         if is_collision and not is_contact:
+            # trajectory_start_time = None
             trajectory_goal = None
             trajectory_start = None
-            # trajectory_start_time = None
             target_goal = None
             last_tick_time = None
             trajectory_elapsed = 0.0
@@ -306,22 +312,7 @@ def main():
         apply_fk(robot, robot.state, home_poses)
 
         # 트위스트 업데이트 시점: 트위스트는 현재 qpos에 대한 자코비안 행렬과 관절 속도의 곱으로 표현되므로 qpos를 적용한 이후 업데이트함
-        robot.state.body_twists.clear()
-        for node in robot.root_body.iter_nodes():
-            body_name = node.name
-
-            if body_name == object_name:
-                joint = node.joints[0]
-                addr = joint["qpos_addr"]
-                robot.state.body_twists[body_name] = np.r_[np.zeros(3), robot.state.qvel[addr : addr + 3]]
-            elif body_name in {"world", "base_table"}:
-                robot.state.body_twists[body_name] = np.zeros(6)
-            elif body_name in {"arm_r_link7", "hx5_r_base"} or body_name.startswith("finger_r_link"):
-                robot.state.body_twists[body_name] = compute_body_twist(
-                    robot,
-                    robot.state,
-                    target_body=body_name,
-                )
+        update_body_twists(robot, robot.state, object_name)
 
         if can_grasp:  # 접촉 bodynode에 기반해 캔의 변위 설정
             contact_body_pos = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
@@ -335,6 +326,9 @@ def main():
             apply_translation(robot, object_name, object_displacement)
             update_qvel(robot, object_name, object_displacement, raw_dt)
 
+        #####################################
+        # Solver
+        #####################################
         contacts = None
         if is_contact or can_grasp:
             _, _, contacts = check_collision(
@@ -362,6 +356,9 @@ def main():
 
         dynamics_dict[object_name]["is_grasped"] = can_grasp
 
+        #####################################
+        # Integrator
+        #####################################
         if object_contacts and not can_grasp:
             object_force = sum_contact_forces(  # 물체에 가해지는 힘 벡터를 합산
                 contacts=object_contacts,
