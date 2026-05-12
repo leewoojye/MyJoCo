@@ -34,7 +34,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 ## Core Implementation
 
-#### Robot model
+<!-- #### Robot model
 
 - `BodyNode`, `GeomRecord`, `RobotModel`, `RobotState`로 구조를 분리
 
@@ -73,7 +73,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 #### GUI
 
-- Target pose panel과 grasp panel 구현
+- Target pose panel과 grasp panel 구현 -->
 
 <!-- - MuJoCo XML loading and robot model construction.
 - Forward kinematics and inverse kinematics for arm and hand control.
