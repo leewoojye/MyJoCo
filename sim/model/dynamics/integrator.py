@@ -1,7 +1,8 @@
 import numpy as np
 
 
-def apply_translation(robot, body_name, displacement):
+# 변위 업데이트 및 실제 적용
+def apply_pos(robot, body_name, displacement):
     body_node = robot.body_node_for(body_name)
     joint = body_node.joints[0]
     addr = joint["qpos_addr"]
@@ -19,7 +20,7 @@ def apply_translation(robot, body_name, displacement):
         node.world_transform = delta @ node.world_transform
 
 
-# update_body_qvel_from_displacement
+# 속도 업데이트
 def update_qvel(robot, body_name, displacement, dt):
     if dt <= 0:
         return
@@ -41,7 +42,7 @@ def integrate_force(robot, body_name, force, mass, dt):
 
     object_acc = force / mass
     object_displacement = 0.5 * object_acc * dt**2
-    apply_translation(robot, body_name, object_displacement) # qpos 및 mesh transform 갱신
+    apply_pos(robot, body_name, object_displacement)  # qpos 및 mesh transform 갱신
     update_qvel(robot, body_name, object_displacement, dt)
 
     return object_displacement

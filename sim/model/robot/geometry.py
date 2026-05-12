@@ -19,7 +19,7 @@ class GeomRecord:
     geom_type: str
     mesh_id: Optional[int]
     mesh_name: Optional[str]
-    # 동적인 메타데이터 필드ㄷ (현재 open3d mesh의 위치)
+    # 동적인 메타데이터 필드 (현재 open3d mesh의 위치)
     transform: np.ndarray
     is_end_effector: bool = False
 

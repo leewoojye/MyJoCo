@@ -119,7 +119,7 @@ def update_body_twists(robot: RobotModel, state: RobotState, object_body_name):
         if body_name == object_body_name:
             joint = node.joints[0]
             addr = joint["qpos_addr"]
-            state.body_twists[body_name] = np.r_[np.zeros(3), state.qvel[addr : addr + 3]]
+            state.body_twists[body_name] = np.r_[np.zeros(3), state.qvel[addr : addr + 3]] # 선속도만 고려 (추후 수정)
         elif body_name in {"world", "base_table"}:
             state.body_twists[body_name] = np.zeros(6)
         elif body_name in {"arm_r_link7", "hx5_r_base"} or body_name.startswith("finger_r_link"):

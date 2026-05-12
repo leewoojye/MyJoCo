@@ -13,7 +13,7 @@ def compute_fk_all_links_recursive(
     node: BodyNode,
     state: RobotState,
     home_pose,
-    cum_T,
+    cum_exp,  # 누적 exponential product
     all_link_poses,
     include_node_joints=True,
 ):
@@ -25,17 +25,17 @@ def compute_fk_all_links_recursive(
             S = unit_screw_axis(q, w, 0, joint["type"])
             theta = state.get(joint["name"])  # PoE에서 세타는 기준 자세로부터 joint displacement
 
-            # M(home configuration) 성분이 0이 아니면 목표 관절값에서 M만큼 빼줌
-            if "_qpos" in home_pose:  # _qpos는 home configuration의 qpos
+            # M(home configuration)이 0이 아니면 목표 관절값에서 M만큼 빼줌
+            if "_qpos" in home_pose:
                 theta -= home_pose["_qpos"][joint["qpos_addr"]]
-                
-            S_exp = screw_hat(S) * theta
-            cum_T = cum_T @ expm(S_exp)
 
-    all_link_poses[node.name] = cum_T @ home_pose[node.name]
+            S_exp = screw_hat(S) * theta
+            cum_exp = cum_exp @ expm(S_exp)
+
+    all_link_poses[node.name] = cum_exp @ home_pose[node.name]
 
     for child in node.children:
-        compute_fk_all_links_recursive(child, state, home_pose, cum_T, all_link_poses)
+        compute_fk_all_links_recursive(child, state, home_pose, cum_exp, all_link_poses)
 
     return
 

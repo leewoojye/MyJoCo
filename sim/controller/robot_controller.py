@@ -4,7 +4,7 @@ import time
 
 from sim.model.collision.collision_check import check_collision
 from sim.model.dynamics.integrator import (
-    apply_translation,
+    apply_pos,
     integrate_force,
     update_qvel,
 )
@@ -323,7 +323,7 @@ def main():
                 offset = object_pos - contact_body_pos
 
             object_displacement = contact_body_pos + offset - object_pos
-            apply_translation(robot, object_name, object_displacement)
+            apply_pos(robot, object_name, object_displacement)
             update_qvel(robot, object_name, object_displacement, raw_dt)
 
         #####################################

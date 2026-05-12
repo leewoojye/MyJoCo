@@ -138,8 +138,8 @@ def check_collision(
 
 # collision_check()로부터 후보 접촉점 배열을 받아 ContactPoint 배열을 생성
 # 접촉점에서의 위치와 힘
-def build_contact_candidates(robot: RobotModel, state: RobotState, M):
-    is_collision, is_contact, contact_candidates = check_collision(robot, state, M, True)
+def build_contact_candidates(robot: RobotModel, state: RobotState, home_pose):
+    is_collision, is_contact, _ = check_collision(robot, state, home_pose, True)
     contactpoint_list = []
     if is_collision or not is_contact:
         return None

@@ -13,6 +13,7 @@ def check_force_closure():
     return
 
 
+# force closure check
 # 평형 조건 확인과 동시에 평형을 위한 접촉점별 힘(가중치)을 계산
 def solve_contact_forces(contact_points, external_wrench, friction_coefficient):
     # external_wrench: 중력항

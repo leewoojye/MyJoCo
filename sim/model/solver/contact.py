@@ -26,7 +26,7 @@ class ContactPoint:
     distance: float  # d = 0: 접촉, d < 0: 관통
     depth: float  # penetration depth, 손과 캔이 관통 상태일 때도 contact 상태로 취급하고 관통한 깊이를 캔 이동거리 계산에 활용함
     # 법선 단위 벡터
-    normal: np.ndarray
+    normal: np.ndarray # 지금 normal 입력이 필수인데, post_init()에서 만드는 방향도 고려
     # 접선 단위 벡터
     tangent: np.ndarray | None = None
 
