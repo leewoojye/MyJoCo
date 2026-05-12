@@ -59,7 +59,7 @@ def solve_contact_forces(contact_points, external_wrench, friction_coefficient):
     G = np.column_stack(wrenches)  # wrench edge를 합쳐 G 생성
     m = G.shape[1]  # wrench edge 계수
 
-    # 정적 평형(Static Equilibrium) 상태를 위한 접촉력 계산...
+    # 정적 평형(Static Equilibrium) 상태를 위한 접촉력 가중치 계산...
     result = linprog(
         c=np.ones(m),  # minimize sum(f)
         A_eq=G,
