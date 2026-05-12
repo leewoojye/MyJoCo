@@ -1,5 +1,5 @@
 
-![Simulator preview](/assets/images/img0.png)
+![Simulator preview](/assets/images/img2.png)
 
 ## Simulator Overview
 
@@ -130,6 +130,6 @@ docs/                   Notes and study references.
 - Python
 - NumPy
 - SciPy
-- MuJoCo
 - Open3D
 - python-fcl
+- MuJoCo
