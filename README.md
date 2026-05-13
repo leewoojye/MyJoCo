@@ -143,6 +143,19 @@ tests/                  Experimental scripts and tests.
 docs/                   Notes and study references.
 ```
 
+### Limitation (future implementation plan)
+- 현재 접촉점에서 물체의 회전을 고려하지 않고 있습니다.
+- 엑추에이터 힘을 별도로 계산하지 않고 고정된 힘 크기를 사용하고 있습니다.
+- force closure를 판단하는 과정에서 원뿔을 네 개의 기저벡터로 근사합니다. 이때 각 기저벡터 앞에 붙는 가중치만 반환하고 실제 힘으로 복원하는 과정이 추가되어야 합니다.
+- Manipulability을 평가하는 로직을 추가해야 합니다.
+- 엔드이펙터를 뜻하는 문자열이 하드코딩되어 있습니다.
+- 캔을 xy 평면에 수평한 방향으로 밀 때, z축 힘을 자른다는 아쉬움이 있습니다.
+- 중력 및 기타 물리 법칙을 환경에 적용해야 합니다.
+- tick loop 및 궤적 형성 과정을 최적화하여 더 부드러운 움직임을 도모해야 합니다.
+- 오른손, 왼손에 연속적으로 IK를 적용하는 게 옳은지 검증해봐야 합니다. 7장 Kinematics of Closed Chains을 참고해야 합니다.
+- capsule proxy 외에 cylinder, sphere 등 다양한 primitive type을 고려해야 합니다.
+- 한 방향으로 힘이 더해질 때 누적되는 힘이 커지는 상황에서 에너지 보존 법칙 활용을 고려하고 있습니다. (레퍼런스: 무조코)
+
 ## References
 
 - Modern Robotics Official lecture slides: Ch. 2 Configuration Space, Ch. 3 Rigid-Body Motions, Ch. 4 Forward Kinematics, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, and Ch. 12 Grasping and Manipulation.
