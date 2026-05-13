@@ -1,6 +1,18 @@
 
 ![Simulator preview](/assets/images/img2.png)
 
+## DEMO
+
+### 26/05/13
+https://youtu.be/gHD_W7J2Uig
+
+캔과 손가락 사이의 접촉, 캔의 밀림이 더 잘 보이는 데모영상입니다.
+
+### 26/05/11
+https://youtu.be/q49b6CsoBwk
+
+데모영상 초안입니다.
+
 ## Simulator Overview
 
 This project is a custom robotics simulator for experimenting with a ROBOTIS FFW-SH5 humanoid upper-body robot, a five-finger hand, and simple object interaction tasks such as pushing, grasping, and lifting a can.
@@ -8,14 +20,6 @@ This project is a custom robotics simulator for experimenting with a ROBOTIS FFW
 The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshes, and runs a kinematics-based interaction loop.
 
 Check out the more detailed implementation journey here! https://leewoojye.github.io/research/2026/05/02/sim_from_scratch.html
-
-## DEMO
-
-### 26/05/13
-https://youtu.be/gHD_W7J2Uig
-
-### 26/05/11
-https://youtu.be/q49b6CsoBwk
 
 ## How to Use
 
