@@ -9,6 +9,14 @@ The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshe
 
 Check out the more detailed implementation journey here! https://leewoojye.github.io/research/2026/05/02/sim_from_scratch.html
 
+## DEMO
+
+### 26/05/13
+https://youtu.be/gHD_W7J2Uig
+
+### 26/05/11
+https://youtu.be/q49b6CsoBwk
+
 ## How to Use
 
 Create and activate a conda environment:

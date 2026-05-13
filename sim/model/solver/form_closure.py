@@ -41,7 +41,7 @@ def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, is_thumb=False):
 
 
 # form closure에서는 모든 접촉점의 wrench로 wrench matrix G를 만들고,
-# force closure는 마찰력을 고려하기에 한 접촉점에서 여러 wrench르 모아 G를 만듦
+# force closure는 마찰력을 고려하기에 한 접촉점에서 여러 wrench를 모아 G를 만듦
 def check_form_closure(contact_points):
     # 조건0: positive span이 공간 전체를 덮어야 해 최소 7개의 접촉점을 가져야함 (공간 기준)
     if len(contact_points) < 7:
