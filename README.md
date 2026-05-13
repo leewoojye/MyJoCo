@@ -46,6 +46,19 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 ## Core Implementation
 
+| 영역 | 구현 내용 |
+| --- | --- |
+| Robot model | BodyNode, GeomRecord, RobotModel, RobotState 클래스 |
+| Math utils | rotation/transform/skew/jacobian matrix, hat 연산 등 |
+| FK | PoE 기반 recursive FK |
+| IK | position IK, pose IK |
+| Trajectory | 0.1초 cubic/quantic time scaling |
+| Collision | 손가락-캔/테이블 중심 필터링, proxy 클래스 |
+| Contact | ContactPoint 클래스, normal/tangent 벡터 계산 |
+| Grasp | alpha interpolation, form/force closure 판단 |
+| Object update | 캔 가속도, 위치 업데이트 |
+| GUI | target pose panel, grasp panel 클래스 |
+
 <!-- #### Robot model
 
 - `BodyNode`, `GeomRecord`, `RobotModel`, `RobotState`로 구조를 분리
@@ -95,7 +108,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 - Form closure and force closure checks for grasp evaluation.
 - Simple contact-based object motion for pushing and grasping experiments. -->
 
-## Additional Implementation
+<!-- ## Additional Implementation -->
 
 <!-- - Open3D-based rendering and GUI panels.
 - Proxy geometry for faster collision distance checks.
@@ -103,11 +116,11 @@ Use the right-side GUI panels to move the right hand target and control the righ
 - Simple grasp attachment behavior after a valid grasp state.
 - Local asset copies under the project-level `assets/` directory. -->
 
-## Future Implementation Plan
+<!-- ## Future Implementation Plan
 - velocity-limited servo
 - mass matrix, actuator dynamics
 - damping/step limit
-- loader_without_mujoco.py
+- loader_without_mujoco.py -->
 
 ## Project Structure
 
