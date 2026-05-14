@@ -12,7 +12,7 @@ def object_body_contacts(contacts, object_body_name):
             continue
 
         if contact.record_a.body_name == object_body_name:
-            contact.normal = -contact.normal
+            contact.normal = -contact.normal # 힘을 받는 주체를 물체로 통일하기 위함
             object_contacts.append(contact)
         elif contact.record_b.body_name == object_body_name:
             object_contacts.append(contact)
@@ -39,12 +39,12 @@ def update_grasp_state(
     body_name,
     object_contacts,
     grasp_changed,
-    can_grasp,
+    is_grasped,
     offset,
     object_mass,
     friction_coefficient,
 ):
-    if object_contacts and grasp_changed and not can_grasp:
+    if object_contacts and grasp_changed and not is_grasped:
         next_can_grasp, _ = evaluate_grasp_hold(
             robot,
             object_name,
@@ -60,10 +60,10 @@ def update_grasp_state(
 
         return False, None
 
-    if grasp_changed and not can_grasp:
+    if grasp_changed and not is_grasped: # 이미 잡은 상태이고, 움직이면 안되는 상황
         return False, None
 
-    if not can_grasp:
+    if not is_grasped:
         return False, None
 
-    return can_grasp, offset
+    return is_grasped, offset

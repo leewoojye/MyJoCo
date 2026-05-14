@@ -13,7 +13,7 @@ from sim.model.solver.contact_constraint import (
 )
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
-from sim.model.solver.form_closure import apply_grasp
+from sim.model.solver.form_closure import compute_grasp
 from sim.model.solver.grasp_solver import object_body_contacts, update_grasp_state
 from sim.model.kinematics.jacobian import update_body_twists
 from sim.model.math3d.rotation import rpy2rotation_matrix
@@ -275,9 +275,7 @@ def main():
         # 추후 수정
         if grasp_goal is not None and not is_grasped:
             next_alpha = float(grasp_goal[0] if grasp_goal_is_thumb else grasp_goal[1])  # thumb 여부를 고려해 goal 설정
-            apply_grasp(
-                robot, candidate_state, next_alpha, grasp_goal_is_thumb
-            )  # 목표 alpha를 candidate_state에 반영
+            compute_grasp(robot, candidate_state, next_alpha, grasp_goal_is_thumb)  # 목표 alpha를 candidate_state에 반영
 
         # 접촉점 상대속도 기반 (강체 자체 상대속도 아님)
         # 흐름도: 상대속도로 각 접촉점에 가해지는 힘 계산(힘 크기는 고정시킨 상태)->계산된 힘 벡터 합산->물체의 질량으로 가속도 및 속도와 변위까지 계산
@@ -304,6 +302,7 @@ def main():
             grasp_goal = None
             return np.r_[current_hand_pos.copy(), target_rot.copy()]
 
+        # 이제부턴 허용되는 collision만 남은 상태
         robot.state.qpos[:] = candidate_state.qpos  # qpos 업데이트
 
         if grasp_goal is not None:
@@ -312,6 +311,7 @@ def main():
             grasp_goal = None
 
         # qpos 업데이트 이후 관절 속도도 업데이트 (추후 수정)
+        # 후보: time-scaling velocity를 사용해보기
         if raw_dt > 0:
             for joint_name, addr in robot.state.qpos_addrs.items():
                 width = robot.state.qpos_widths[joint_name]
@@ -331,7 +331,7 @@ def main():
             object_node = robot.body_node_for(object_name)
             object_pos = object_node.world_transform[:3, 3].copy()  # 물체 위치
 
-            if offset is None:  # 추후 수정
+            if offset is None:
                 offset = object_pos - contact_body_pos
 
             object_displacement = contact_body_pos + offset - object_pos
@@ -387,7 +387,7 @@ def main():
                 physics_dt,
             )
 
-        if trajectory_elapsed >= trajectory_duration:
+        if trajectory_elapsed >= trajectory_duration: # 초반에 elapsed가 초과되어도 조금이라도 움직이게 하기 위해(?) handle_tick() 후반부에서 검사
             # trajectory_start_time = None
             trajectory_start = None
             trajectory_goal = None
