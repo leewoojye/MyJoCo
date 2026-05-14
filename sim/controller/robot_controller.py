@@ -13,7 +13,7 @@ from sim.model.solver.contact_constraint import (
 )
 from sim.model.kinematics.fk import apply_fk
 from sim.model.kinematics.ik import apply_ik
-from sim.model.solver.form_closure import compute_grasp
+from sim.model.solver.form_closure import apply_grasp
 from sim.model.solver.grasp_solver import object_body_contacts, update_grasp_state
 from sim.model.kinematics.jacobian import update_body_twists
 from sim.model.math3d.rotation import rpy2rotation_matrix
@@ -133,20 +133,23 @@ def main():
     home_poses["_qpos"] = robot.state.qpos.copy()
     right_target_body = "arm_r_link7"
     left_target_body = "arm_l_link7"
-    right_target_base_rot = robot.body_node_for(right_target_body).world_transform[:3, :3].copy()
+    right_target_base_rot = (
+        robot.body_node_for(right_target_body).world_transform[:3, :3].copy()
+    )  # roll/pitch/yaw 조종의 기준이 되는 회전 상태 저장
     left_hand_pos = (
         robot.body_node_for(left_target_body).world_transform[:3, 3].copy()
     )  # position IK로 위치를 고정할 왼손 위치 추출
 
+    # 이벤트 핸들러가 갱신하는 패널에서 주어진 입력
     target_goal = None  # target panel에서 주어진 x, y, z
     target_rot = np.zeros(3)  # 주어진 roll, pitch, yaw
 
-    # 로봇팔 궤적 관련 변수
+    # 궤적 관련 변수
     # trajectory_start_time = None
     trajectory_start = None
     trajectory_goal = None  # 형성된 단일 궤적의 목표
     last_tick_time = None
-    trajectory_elapsed = 0.0
+    trajectory_elapsed = 0.0  # 특정 궤적 안에서 진행된 정도
     trajectory_duration = 0.1  # 단일 궤적 시간 고정
     object_name = "pr_cokeCan"  # 상호작용할 물체 지정 (추후 리펙토링)
     friction_coefficient = (
@@ -157,7 +160,7 @@ def main():
     grasp_alpha = np.zeros(2)
     grasp_goal = None  # grasp panel에서 들어온 목표 alpha
     grasp_goal_is_thumb = False  # 엄지인지 나머지 네마디인지
-    can_grasp = False  # grasp 여부를 나타내는 flag 변수
+    is_grasped = False  # grasp 여부를 나타내는 flag 변수
     offset = None  # 캔을 잡은 상태에서 캔 중심과 손 기준점 사이의 거리, 손과 캔의 변위를 같게 유지하기 위함
 
     # dynamics 상태 관리
@@ -181,6 +184,7 @@ def main():
 
     def handle_grasp_changed(alpha, is_thumb):
         nonlocal grasp_goal, grasp_goal_is_thumb
+
         grasp_goal = np.asarray(alpha, dtype=float).reshape(2)
         grasp_goal_is_thumb = is_thumb
 
@@ -197,7 +201,7 @@ def main():
             trajectory_elapsed, \
             grasp_goal, \
             grasp_goal_is_thumb, \
-            can_grasp, \
+            is_grasped, \
             offset, \
             dynamics_dict
 
@@ -221,14 +225,16 @@ def main():
                 trajectory_start = current_hand_pos.copy()
                 trajectory_goal = target_goal.copy()
                 trajectory_elapsed = 0.0
-            elif not np.allclose(trajectory_goal, target_goal):
+            elif not np.allclose(
+                trajectory_goal, target_goal
+            ):  # 기존 궤적의 끝, 목표 지점 간 차이가 있다면 새로운 궤적을 생성, 끊김을 완화할 수 있을 것으로 기대
                 trajectory_start = current_hand_pos.copy()
                 trajectory_goal = target_goal.copy()
                 trajectory_elapsed = 0.0
 
             trajectory_elapsed += raw_dt
 
-            t = min(trajectory_elapsed, trajectory_duration)
+            t = min(trajectory_elapsed, trajectory_duration)  # 궤적 범위를 넘지 않도록 클리핑
             target_pos = interpolate_position(trajectory_start, trajectory_goal, trajectory_duration, t)
 
         candidate_state = RobotState(
@@ -241,6 +247,7 @@ def main():
         if target_goal is not None:
             # rot = rpy2rotation_matrix(target_rot[0], target_rot[1], target_rot[2])
             rot_offset = rpy2rotation_matrix(target_rot[0], target_rot[1], target_rot[2])
+            # rot = rot_offset @ right_target_base_rot
             rot = right_target_base_rot @ rot_offset
 
             # 오른손에 pose IK 계산, 캔 잡는 모션을 더 용이하게
@@ -264,9 +271,13 @@ def main():
                 left_target_body,
             )
 
-        if grasp_goal is not None and not can_grasp:
-            next_alpha = float(grasp_goal[0] if grasp_goal_is_thumb else grasp_goal[1])
-            compute_grasp(robot, candidate_state, next_alpha, grasp_goal_is_thumb)  # candidate_state
+        # grasp 입력이 있고, 캔을 잡은 상태가 아니라면 손가락 포즈를 업데이트할 수 있으므로 손가락 관절을 계산함
+        # 추후 수정
+        if grasp_goal is not None and not is_grasped:
+            next_alpha = float(grasp_goal[0] if grasp_goal_is_thumb else grasp_goal[1])  # thumb 여부를 고려해 goal 설정
+            apply_grasp(
+                robot, candidate_state, next_alpha, grasp_goal_is_thumb
+            )  # 목표 alpha를 candidate_state에 반영
 
         # 접촉점 상대속도 기반 (강체 자체 상대속도 아님)
         # 흐름도: 상대속도로 각 접촉점에 가해지는 힘 계산(힘 크기는 고정시킨 상태)->계산된 힘 벡터 합산->물체의 질량으로 가속도 및 속도와 변위까지 계산
@@ -283,7 +294,7 @@ def main():
             return_contacts=False,
         )
 
-        if is_collision and not is_contact:
+        if is_collision and not is_contact:  # hard collision은 FK를 수행하지 않고 바로 return
             # trajectory_start_time = None
             trajectory_goal = None
             trajectory_start = None
@@ -293,36 +304,38 @@ def main():
             grasp_goal = None
             return np.r_[current_hand_pos.copy(), target_rot.copy()]
 
-        robot.state.qpos[:] = candidate_state.qpos
+        robot.state.qpos[:] = candidate_state.qpos  # qpos 업데이트
 
         if grasp_goal is not None:
-            if not can_grasp:
+            if not is_grasped:  # 물체를 잡지 않은 상태, 즉 손가락을 움직일 수 있는 상태 (추후 수정)
                 grasp_alpha[:] = grasp_goal
             grasp_goal = None
 
-        # 충돌 판단 직후 관절 속도 업데이트
+        # qpos 업데이트 이후 관절 속도도 업데이트 (추후 수정)
         if raw_dt > 0:
             for joint_name, addr in robot.state.qpos_addrs.items():
                 width = robot.state.qpos_widths[joint_name]
                 robot.state.qvel[addr : addr + width] = (
                     robot.state.qpos[addr : addr + width] - prev_qpos[addr : addr + width]
-                ) / raw_dt
+                ) / raw_dt  # 이동한 관절위치를 dt로 나누어 관절속도를 구함
 
         # FK 적용: 왼손, 오른손, 손가락 동시에
         apply_fk(robot, robot.state, home_poses)
 
         # 트위스트 업데이트 시점: 트위스트는 현재 qpos에 대한 자코비안 행렬과 관절 속도의 곱으로 표현되므로 qpos를 적용한 이후 업데이트함
+        # 근데 트위스트를 업데이트하고 충돌 감지에서 걸린 경우 고려해야 -> 사전에 hard collision 경우는 rollback해서 괜찮음
         update_body_twists(robot, robot.state, object_name)
 
-        if can_grasp:  # 접촉 bodynode에 기반해 캔의 변위 설정
+        if is_grasped:  # 물체를 잡고 있는 상태면 손과 물체가 동일한 변위를 갖게 함
             contact_body_pos = robot.body_node_for(right_target_body).world_transform[:3, 3].copy()
-            body_node = robot.body_node_for(object_name)
-            object_pos = body_node.world_transform[:3, 3].copy()
+            object_node = robot.body_node_for(object_name)
+            object_pos = object_node.world_transform[:3, 3].copy()  # 물체 위치
 
-            if offset is None:
+            if offset is None:  # 추후 수정
                 offset = object_pos - contact_body_pos
 
             object_displacement = contact_body_pos + offset - object_pos
+            # 잡힌 물체의 위치와 속도 업데이트
             apply_pos(robot, object_name, object_displacement)
             update_qvel(robot, object_name, object_displacement, raw_dt)
 
@@ -330,7 +343,7 @@ def main():
         # Solver
         #####################################
         contacts = None
-        if is_contact or can_grasp:
+        if is_contact or is_grasped:
             _, _, contacts = check_collision(
                 robot,
                 robot.state,
@@ -342,24 +355,24 @@ def main():
 
         # 접촉점에서의 상대속도 계산은 compute_contact_force_sum() 내부에서 수행
 
-        can_grasp, offset = update_grasp_state(
+        is_grasped, offset = update_grasp_state(
             robot,
             object_name,
             right_target_body,
             object_contacts,
             grasp_changed,
-            can_grasp,
+            is_grasped,
             offset,
             dynamics_dict[object_name]["mass"],
             friction_coefficient,
         )
 
-        dynamics_dict[object_name]["is_grasped"] = can_grasp
+        dynamics_dict[object_name]["is_grasped"] = is_grasped
 
         #####################################
         # Integrator
         #####################################
-        if object_contacts and not can_grasp:
+        if object_contacts and not is_grasped:
             object_force = sum_contact_forces(  # 물체에 가해지는 힘 벡터를 합산
                 contacts=object_contacts,
             )

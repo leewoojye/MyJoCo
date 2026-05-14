@@ -5,7 +5,7 @@ from sim.model.robot.robot_model import RobotModel
 from sim.model.robot.robot_state import RobotState
 
 
-def compute_grasp(robot: RobotModel, state: RobotState, alpha, is_thumb):
+def apply_grasp(robot: RobotModel, state: RobotState, alpha, is_thumb):
     # q = (1 - grasp) q_open + grasp q_closed
     q_open = 0
 
@@ -34,7 +34,7 @@ def compute_grasp(robot: RobotModel, state: RobotState, alpha, is_thumb):
 
 
 def apply_grasp(robot: RobotModel, state: RobotState, M, alpha, is_thumb=False):
-    state = compute_grasp(robot, state, alpha, is_thumb)
+    state = apply_grasp(robot, state, alpha, is_thumb)
     robot = apply_fk(robot, state, M)
 
     return robot

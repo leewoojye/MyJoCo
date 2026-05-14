@@ -155,6 +155,8 @@ docs/                   Notes and study references.
 - 오른손, 왼손에 연속적으로 IK를 적용하는 게 옳은지 검증해봐야 합니다. 7장 Kinematics of Closed Chains을 참고해야 합니다.
 - capsule proxy 외에 cylinder, sphere 등 다양한 primitive type을 고려해야 합니다.
 - 한 방향으로 힘이 더해질 때 누적되는 힘이 커지는 상황에서 에너지 보존 법칙 활용을 고려하고 있습니다. (레퍼런스: 무조코)
+- 충돌 감지 로직에서 후보 state에 대해 hard collision이면 단순 rollback을 수행하고 있으며, 접촉 지점까지라도 FK가 적용될 수 있어야 합니다.
+- 
 
 ## References
 
