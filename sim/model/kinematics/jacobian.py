@@ -93,8 +93,8 @@ def compute_geometric_jacobian(robot: RobotModel, link_poses=None, target_body="
     for node, joint in all_joints:  # 회전관절 가정 (추후 수정)
         joint_transform = link_poses[node.name] if link_poses is not None else node.world_transform
 
-        q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3]
-        w = joint_transform[:3, :3] @ joint["axis"]
+        q = joint_transform[:3, :3] @ joint["pos"] + joint_transform[:3, 3] # link local frame으로 표현된 위치 p를 space frame 기준으로 나타냄
+        w = joint_transform[:3, :3] @ joint["axis"] # 방향 벡터는 회전만 적용
         J_i = unit_screw_axis(q, w, 0, joint["type"])
         all_S.append(J_i)  # 열벡터 append
         joints.append(joint)

@@ -43,9 +43,9 @@ def solve_contact_forces(contact_points, external_wrench, friction_coefficient):
         basis2 = np.cross(normal, basis1)
         basis2 = basis2 / np.linalg.norm(basis2)
 
-        # 원뿔 근사 
+        # 마찰 원뿔(법선힘 + 마찰력을 합친 전체 접촉력 force의 가능한 집합) 근사
         edge_forces = [  # 각 edge force를 wrench로 변환
-            normal + friction_coefficient * basis1,
+            normal + friction_coefficient * basis1,  # ||f_tangent|| <= μ f_normal
             normal - friction_coefficient * basis1,
             normal + friction_coefficient * basis2,
             normal - friction_coefficient * basis2,
