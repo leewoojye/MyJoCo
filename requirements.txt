@@ -6,6 +6,7 @@ python-fcl==0.7.0.11
 
 # Experiment/test scripts under tests/
 matplotlib==3.10.9
+mediapy==1.2.6
 pygame==2.6.1
 trimesh==4.12.2
 viser==1.0.26
