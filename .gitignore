@@ -1,6 +1,7 @@
 /robotis_mujoco_menagerie/
 /venv/
 /temp/
+/.vscode/
 /.cache/
 /spot/
 /spots/
