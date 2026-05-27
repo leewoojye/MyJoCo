@@ -15,11 +15,16 @@ def damped_pseudoinverse(J, damping=1e-3):
 # body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "arm")
 # joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
 # site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
-def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site_id
+def solve_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site_id
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
 
     # theta_prev = data.qpos.copy()  # forward 적용 이전의 qpos
     # theta = data.qpos.copy()
+    ik_data = mujoco.MjData(model)
+    ik_data.qpos[:] = data.qpos
+    ik_data.qvel[:] = data.qvel
+    mujoco.mj_forward(model, ik_data)
+
     iter = 0
     joint_ids = []
     bid = body_id
@@ -39,7 +44,7 @@ def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site
 
     while True:
         # 자코비안(body origin 기준), 트위스트 에러 계산
-        T_sb = get_body_T(data, body_id)
+        T_sb = get_body_T(ik_data, body_id)
         T_sd = target_T
         if is_pose:
             _, err = calculate_twist_error(T_sb, T_sd)  # 트위스트 에러
@@ -49,7 +54,7 @@ def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site
         # body origin 기준으로 자코비안 계산
         jacp = np.zeros((3, model.nv))
         jacr = np.zeros((3, model.nv))
-        mujoco.mj_jacBody(model, data, jacp, jacr, body_id)  # mj_jacBody vs. mj_jacSite
+        mujoco.mj_jacBody(model, ik_data, jacp, jacr, body_id)  # mj_jacBody vs. mj_jacSite
 
         J = np.vstack([jacr, jacp])  # shape: (6, model.nv), (w, v)열의 집합
         J_b = Adjoint(np.linalg.inv(T_sb)) @ J  # 전체 jacobian DOF에 대한 body frame jacobian
@@ -78,16 +83,16 @@ def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site
             # jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
             qadr = model.jnt_qposadr[jid]
 
-            data.qpos[qadr] += dq_i
+            ik_data.qpos[qadr] += dq_i
 
             # 관절각 제약 기반 클리핑
             if model.jnt_limited[jid]:
                 q_lower, q_upper = model.jnt_range[jid]
-                data.qpos[qadr] = np.clip(data.qpos[qadr], q_lower, q_upper)
+                ik_data.qpos[qadr] = np.clip(ik_data.qpos[qadr], q_lower, q_upper)
 
         # 각변위만큼 이동
-        mujoco.mj_forward(model, data)
-        T_sb = get_body_T(data, body_id)
+        mujoco.mj_forward(model, ik_data)
+        T_sb = get_body_T(ik_data, body_id)
 
         # forward 이후 갱신된 트위스트(위치) 오차로 종료 조건 검사 (반복문 앞에 배치해도 무관)
         if is_pose:
@@ -107,5 +112,5 @@ def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site
     # delta_theta = theta - theta_prev
     # delta_theta = np.clip(delta_theta, -max_theta_step, max_theta_step)
 
-    # 반환: ik error
-    return
+    # 반환: ik target qpos
+    return ik_data.qpos.copy(), joint_ids

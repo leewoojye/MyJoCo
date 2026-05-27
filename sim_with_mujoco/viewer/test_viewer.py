@@ -4,6 +4,9 @@ import glfw
 import mujoco
 import numpy as np
 
+from sim.model.motion.trajectory import interpolate_position
+from sim_with_mujoco.utils.ik import solve_ik
+from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
 # from sim_with_mujoco.mjcf import parser
 
@@ -52,10 +55,11 @@ def main():
         mujoco.mjtObj.mjOBJ_BODY,
         "arm_r_link7",
     )
-    initial_target = data.xpos[body_id].copy()
+    initial_target_pos = data.xpos[body_id].copy()
+    initial_pose = get_body_T(data, body_id)
 
     hand_pose_panel = GlfwTargetPanel(
-        initial_target,
+        initial_target_pos,
         slider_range=slider_range,
         rotation_slider_range=rotation_slider_range,
     )
@@ -63,13 +67,13 @@ def main():
     if not glfw.init():
         raise RuntimeError("Failed to initialize GLFW")
 
-    window = glfw.create_window(1200, 900, "MuJoCo GLFW Demo", None, None)
+    window = glfw.create_window(1200, 900, "MyJoCo", None, None)
     if not window:
         glfw.terminate()
         raise RuntimeError("Failed to create GLFW window")
 
     glfw.make_context_current(window)
-    glfw.swap_interval(1)
+    glfw.swap_interval(1)  # 창 갱신을 모니터 refresh 주기에 맞춤
 
     cam = mujoco.MjvCamera()
     opt = mujoco.MjvOption()
@@ -89,16 +93,58 @@ def main():
     cam.azimuth = 90
     cam.elevation = -20
 
+    # 궤적 형성 관련 변수
+    trajectory_start = initial_target_pos.copy()
+    trajectory_goal = initial_target_pos.copy()
+    current_target = initial_target_pos.copy()
+    trajectory_start_time = None
+    trajectory_duration = 1.0
+
     try:
-        while not glfw.window_should_close(window): # 렌더링 루프
+        while not glfw.window_should_close(window):  # 렌더링 루프
             glfw.poll_events()
-            target = hand_pose_panel.poll_target(window)
-            if target is not None:
-                print(target)
+
+            polled_target = hand_pose_panel.poll_target(window)  # polling 방식
+            if polled_target is not None:
+                trajectory_start = current_target.copy()
+                trajectory_goal = polled_target[:3].copy()
+                trajectory_start_time = time.time()
+
+            if trajectory_start_time is not None:
+                t = time.time() - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
+
+                if t >= trajectory_duration:
+                    current_target = trajectory_goal.copy()
+                    trajectory_start_time = None
+                else:
+                    current_target = interpolate_position(
+                        trajectory_start,
+                        trajectory_goal,
+                        trajectory_duration,
+                        t,
+                    )
+
+            new_target = initial_pose.copy()
+            new_target[:3, 3] = current_target
 
             step_start = time.time()
 
-            while time.time() - step_start < 1.0 / 60.0: # 시뮬레이션 루프
+            while time.time() - step_start <= 1.0 / 60.0:  # 시뮬레이션 루프
+                # target = hand_pose_panel.poll_target(window)
+                # target_i = interpolate_position(
+                #     trajectory_start, trajectory_goal, trajectory_duration, time.time() - step_start
+                # )
+                # new_target[:3, 3] = target_i
+                q_des, joint_ids = solve_ik(model, data, body_id, new_target, True)
+                for joint_id in joint_ids:
+                    joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+                    actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+                    if actuator_id < 0:
+                        continue
+
+                    qadr = model.jnt_qposadr[joint_id]
+                    data.ctrl[actuator_id] = q_des[qadr]
+
                 mujoco.mj_step(model, data)
 
             width, height = glfw.get_framebuffer_size(window)
@@ -114,9 +160,12 @@ def main():
                 scene,
             )
 
+            # 다음 화면을 그려 버퍼에 저장
             mujoco.mjr_render(viewport, scene, context)
             hand_pose_panel.render(window, context)
 
+            # GLFW/OpenGL - double buffering
+            # render()가 그린 화면을 비로소 창에 띄움
             glfw.swap_buffers(window)
 
     finally:
