@@ -15,7 +15,7 @@ def damped_pseudoinverse(J, damping=1e-3):
 # body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "arm")
 # joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
 # site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
-def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # site_id vs. body_id
+def solve_pose_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site_id
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
 
     # theta_prev = data.qpos.copy()  # forward 적용 이전의 qpos

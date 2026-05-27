@@ -77,7 +77,8 @@ class Environment:
     def reset():
         return
 
-    def forward():
-        # ik solver 호출
-
+    def forward(self, qpos):
+        # ik solver 호출 (보류)
+        self.data.qpos = qpos
+        mujoco.mj_forward(self.model, self.data)
         return
