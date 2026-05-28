@@ -16,6 +16,10 @@ class Environment:
     # contact points 가져오기 (렌더링용)
     # e.e의 site/body id field
 
+    # viewer, environment(simulator state management) 분리
+    # main.py는 렌더링 루프, 시뮬레이션 루프 이중 반복문 구조
+    # main.py에서 view(mujoco viewer, glfw panel), env 인스턴스 생성 -> 매 렌더링마다 panel state polling -> polled target으로 ik solver 호출 -> 목표 관절각 env.forward() ->
+
     def __init__(self, xml_path, end_effector):
         self.model, self.data = parser(xml_path)
         self.ee_body_id = mujoco.mj_name2id(
@@ -28,13 +32,17 @@ class Environment:
         return
 
     def set_ctrl():
+
         return
 
-    def step(self):
-        mujoco.mj_step(self.model, self.data)
+    def step(self, nstep=1):
+        mujoco.mj_step(self.model, self.data, nstep)
         return
 
     def render():
+        # 렌더링 주기 - 시뮬레이션 주기 분리
+        # viewer 인스턴스의 render api 호출해서 window buffer 업데이트
+        # 렌더링 로직은 viewer 인스턴스에서 전담하고 env.render()는 wrapper 용도
         return
 
     def get_state():

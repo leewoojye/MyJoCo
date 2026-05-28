@@ -16,6 +16,11 @@ class GlfwTargetPanel:
 
     def poll_target(self, window):
         mouse_x, mouse_y = glfw.get_cursor_pos(window)
+        win_w, win_h = glfw.get_window_size(window)
+        fb_w, fb_h = glfw.get_framebuffer_size(window)
+        mouse_x = mouse_x * fb_w / win_w
+        mouse_y = (win_h - mouse_y) * fb_h / win_h
+
         pressed = glfw.get_mouse_button(window, glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
 
         if pressed:

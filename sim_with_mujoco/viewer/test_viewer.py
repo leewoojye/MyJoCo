@@ -45,8 +45,44 @@ XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/sce
 
 def main():
     model = mujoco.MjModel.from_xml_path(XML_PATH)
+    # model.opt.gravity[:] = 0
     data = mujoco.MjData(model)
-    mujoco.mj_kinematics(model, data)
+    initial_qpos = {
+        "lift_joint": -0.15,
+        "head_joint1": 0.0,
+        "head_joint2": 0.0,
+        "arm_l_joint1": 0.0,
+        "arm_l_joint2": 0.0,
+        "arm_l_joint3": 0.0,
+        "arm_l_joint4": -1.57,
+        "arm_l_joint5": 0.0,
+        "arm_l_joint6": 0.0,
+        "arm_l_joint7": 0.0,
+        "arm_r_joint1": 0.0,
+        "arm_r_joint2": 0.0,
+        "arm_r_joint3": 0.0,
+        "arm_r_joint4": -1.57,
+        "arm_r_joint5": 0.0,
+        "arm_r_joint6": 0.0,
+        "arm_r_joint7": 0.0,
+        "finger_l_joint1": 0.3,
+        "finger_l_joint2": 1.57,
+        "finger_l_joint3": -0.35,
+        "finger_l_joint4": -0.25,
+        "finger_r_joint1": 0.3,
+        "finger_r_joint2": -1.57,
+        "finger_r_joint3": 0.35,
+        "finger_r_joint4": 0.25,
+    }
+    for name, value in initial_qpos.items():
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
+        qadr = model.jnt_qposadr[joint_id]
+        data.qpos[qadr] = value
+        data.ctrl[actuator_id] = data.qpos[qadr]
+
+    # mujoco.mj_kinematics(model, data)  # 현재 qpos 기준으로 body/site/geom xpos, xmat 갱신 (위치/자세 계산 중심)
+    mujoco.mj_forward(model, data)  # qpos/qvel/ctrl 기준으로 kinematics + velocity, force, qacc 등등까지 계산
 
     slider_range = (-0.2, 0.2)  # end-effector 조작 범위
     rotation_slider_range = (-0.15, 0.15)
@@ -104,7 +140,18 @@ def main():
         while not glfw.window_should_close(window):  # 렌더링 루프
             glfw.poll_events()
 
-            polled_target = hand_pose_panel.poll_target(window)  # polling 방식
+            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 주기 분리
+            # 주기 관리: 반복문 / 조건문
+            poll_interval = 0.05
+            last_poll_time = 0.0
+            now = time.time()
+            polled_target = None
+
+            if now - last_poll_time >= poll_interval:
+                polled_target = hand_pose_panel.poll_target(window)
+                last_poll_time = now
+
+            # polled_target = hand_pose_panel.poll_target(window)  # polling 방식
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -127,9 +174,9 @@ def main():
             new_target = initial_pose.copy()
             new_target[:3, 3] = current_target
 
-            step_start = time.time()
+            step_start_time = time.time()
 
-            while time.time() - step_start <= 1.0 / 60.0:  # 시뮬레이션 루프
+            while time.time() - step_start_time <= 1.0 / 60.0:  # 시뮬레이션 루프
                 # target = hand_pose_panel.poll_target(window)
                 # target_i = interpolate_position(
                 #     trajectory_start, trajectory_goal, trajectory_duration, time.time() - step_start
@@ -142,10 +189,19 @@ def main():
                     if actuator_id < 0:
                         continue
 
-                    qadr = model.jnt_qposadr[joint_id]
-                    data.ctrl[actuator_id] = q_des[qadr]
+                    # IK solver result(목표 관절각)를 actuator 제어 입력으로 넣음
+                    # 옵션 1
+                    # qadr = model.jnt_qposadr[joint_id]
+                    # data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
+                    # 옵션 2
+                    for joint_id in joint_ids:
+                        qadr = model.jnt_qposadr[joint_id]
+                        data.qpos[qadr] = q_des[qadr]
 
-                mujoco.mj_step(model, data)
+                    data.qvel[:] = 0.0
+                    mujoco.mj_forward(model, data)
+
+                # mujoco.mj_step(model, data)
 
             width, height = glfw.get_framebuffer_size(window)
             viewport = mujoco.MjrRect(0, 0, width, height)
