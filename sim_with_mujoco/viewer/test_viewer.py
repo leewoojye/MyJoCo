@@ -90,6 +90,16 @@ def main():
         mujoco.mjtObj.mjOBJ_BODY,
         "arm_r_link7",
     )
+    ik_joint_names = [
+        "lift_joint",
+        "arm_r_joint1",
+        "arm_r_joint2",
+        "arm_r_joint3",
+        "arm_r_joint4",
+        "arm_r_joint5",
+        "arm_r_joint6",
+        "arm_r_joint7",
+    ]
     initial_target_pos = data.xpos[body_id].copy()
     initial_pose = get_body_T(data, body_id)
 
@@ -118,7 +128,6 @@ def main():
         mujoco.mjtFontScale.mjFONTSCALE_150,
     )
 
-    # mujoco.mjv_defaultCamera(cam)
     mujoco.mjv_defaultOption(opt)
 
     mujoco.mjv_defaultCamera(cam)
@@ -135,26 +144,32 @@ def main():
     trajectory_start_time = None
     trajectory_duration = 0.05  # poll_interval과 같이 고려
 
+    poll_interval = 0.1
+    last_poll_time = 0.0
+    sim_steps_per_frame = 8
+
     try:
         while not glfw.window_should_close(window):  # 렌더링 루프
             glfw.poll_events()
 
-            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. mj_step() 자체 주기 분리
+            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
             # 주기 관리: 반복문 / 조건문
-            poll_interval = 0.1
-            last_poll_time = 0.0
+            # poll_interval = 0.1
+            # last_poll_time = 0.0
             now = time.time()
             polled_target = None
 
-            if now - last_poll_time >= poll_interval:
-                polled_target = hand_pose_panel.poll_target(window)
-                last_poll_time = now
+            # if now - last_poll_time >= poll_interval:
+            #     polled_target = hand_pose_panel.poll_target(window)  # polling 방식
+            #     last_poll_time = now
 
-            # polled_target = hand_pose_panel.poll_target(window)  # polling 방식
+            polled_target = hand_pose_panel.poll_target(window)  # 매 프레임마다 입력 처리
+            # if polled_target is not None and now - last_poll_time >= poll_interval:
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
                 trajectory_start_time = time.time()
+                last_poll_time = now
 
             if trajectory_start_time is not None:
                 t = time.time() - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
@@ -175,14 +190,15 @@ def main():
 
             step_start_time = time.time()
 
-            while time.time() - step_start_time <= 1.0 / 60.0:  # 시뮬레이션 루프
+            # while time.time() - step_start_time <= 1.0 / 60.0:  # 시뮬레이션 루프
+            for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 # target = hand_pose_panel.poll_target(window)
                 # target_i = interpolate_position(
                 #     trajectory_start, trajectory_goal, trajectory_duration, time.time() - step_start
                 # )
                 # new_target[:3, 3] = target_i
 
-                q_des, joint_ids = solve_ik(model, data, body_id, new_target, True)
+                q_des, joint_ids = solve_ik(model, data, body_id, new_target, True, ik_joint_names)
                 actuator_ids = actuator_ids_from_joints(model, joint_ids)
 
                 for i in range(1):  # 수정 예정
@@ -202,9 +218,14 @@ def main():
                     #     qadr = model.jnt_qposadr[joint_id]
                     #     data.qpos[qadr] = q_des[qadr]
 
-                    # data.qvel[:] = 0.0 # 옵션 2
-                    mujoco.mj_step(model, data)  # 옵션 1
-                    # mujoco.mj_forward(model, data) # 옵션 2
+                    # 옵션 1
+                    mujoco.mj_forward(model, data)
+                    data.qfrc_applied[:] = 0.0
+                    data.qfrc_applied[:] = data.qfrc_bias
+                    mujoco.mj_step(model, data)
+                    # 옵션 2
+                    # data.qvel[:] = 0.0
+                    # mujoco.mj_forward(model, data)
 
             width, height = glfw.get_framebuffer_size(window)
             viewport = mujoco.MjrRect(0, 0, width, height)

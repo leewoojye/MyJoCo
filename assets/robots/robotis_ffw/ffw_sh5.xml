@@ -207,7 +207,7 @@
   <worldbody>
     <body name="base_link" pos="0 0 0.0035">
       <inertial pos="-0.0457 0.0066 0.1943" mass="35.99" diaginertia="0.65 0.65 0.96"/>
-      <freejoint name="floating_base"/>
+      <!-- <freejoint name="floating_base"/> -->
 
       <!-- base_mobile_assy visual -->
       <geom type="mesh" mesh="base_mobile_assy" material="black" class="visual"/>

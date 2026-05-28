@@ -28,11 +28,12 @@ class Environment:
             end_effector,
         )
 
-    def get_ctrl():
-        return
+    def get_ctrl(self):
+        return self.data.ctrl
 
-    def set_ctrl():
-
+    # env.set_control() -> env.step() 흐름
+    def set_ctrl(self, ctrl):
+        np.copyto(self.data.ctrl, ctrl)
         return
 
     def step(self, nstep=1):
@@ -52,8 +53,8 @@ class Environment:
         return
 
     # data.time
-    def get_time():
-        return
+    def get_time(self):
+        return self.data.time
 
     # def set_time(): # mj_step()에서 관리
     #     return

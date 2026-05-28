@@ -3,6 +3,7 @@ import numpy as np
 
 from sim.model.kinematics.ik import calculate_twist_error
 from sim.model.math3d.lie import Adjoint
+from sim_with_mujoco.utils.collision import is_collision
 from sim_with_mujoco.utils.math3d import get_body_T
 
 
@@ -15,31 +16,38 @@ def damped_pseudoinverse(J, damping=1e-3):
 # body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "arm")
 # joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
 # site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
-def solve_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site_id
+def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None):  # 비고: site_id
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
 
-    # theta_prev = data.qpos.copy()  # forward 적용 이전의 qpos
-    # theta = data.qpos.copy()
+    # 복원용 MjData 저장
+    prev_data = mujoco.MjData(model)
+    prev_data.qpos[:] = data.qpos  # 값복사
+    prev_data.qvel[:] = data.qvel
+
+    # IK 결과 반환용 MjData
     ik_data = mujoco.MjData(model)
     ik_data.qpos[:] = data.qpos
     ik_data.qvel[:] = data.qvel
     mujoco.mj_forward(model, ik_data)
 
     iter = 0
-    joint_ids = []
-    bid = body_id
-    # e.e->base 방향으로 순회하며 joint id 배열을 구함
-    while bid > 0:
-        for jnt_offset in range(model.body_jntnum[bid]):
-            jid = model.body_jntadr[bid] + jnt_offset
-            # e.e->base를 잇는 kinematic tree에 회전/직선 관절만 있다고 가정
-            if model.jnt_type[jid] in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
-                joint_ids.append(jid)
-        bid = model.body_parentid[bid]
+    if joint_names is None:
+        joint_ids = []
+        bid = body_id
+        # e.e->base 방향으로 순회하며 joint id 배열을 구함
+        while bid > 0:
+            for jnt_offset in range(model.body_jntnum[bid]):
+                jid = model.body_jntadr[bid] + jnt_offset
+                # e.e->base를 잇는 kinematic tree에 회전/직선 관절만 있다고 가정
+                if model.jnt_type[jid] in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
+                    joint_ids.append(jid)
+            bid = model.body_parentid[bid]
 
-    # joint id vs. dof id
-    # 단일 관절은 여러 dof를 가질 수 있음(예. 회전축이 여러개). 다만 회전/직선 관절은 joint당 하나의 dof를 갖음
-    joint_ids = joint_ids[::-1]  # e.e에서 거슬러 올라가 만든 배열을 뒤집음
+        # joint id vs. dof id
+        # 단일 관절은 여러 dof를 가질 수 있음(예. 회전축이 여러개). 다만 회전/직선 관절은 joint당 하나의 dof를 갖음
+        joint_ids = joint_ids[::-1]  # e.e에서 거슬러 올라가 만든 배열을 뒤집음
+    else:
+        joint_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name) for joint_name in joint_names]
     dof_ids = np.array([model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
 
     while True:
@@ -92,6 +100,9 @@ def solve_ik(model, data, body_id, target_T, is_pose=True):  # 비고: site_id
 
         # 각변위만큼 이동
         mujoco.mj_forward(model, ik_data)
+        # if is_collision(model, ik_data):  # forward한 결과가 penetration이면 이전 qpos로 rollback
+        #     mujoco.mj_copyData(ik_data, model, prev_data)
+        #     mujoco.mj_forward(model, ik_data)
         T_sb = get_body_T(ik_data, body_id)
 
         # forward 이후 갱신된 트위스트(위치) 오차로 종료 조건 검사 (반복문 앞에 배치해도 무관)
