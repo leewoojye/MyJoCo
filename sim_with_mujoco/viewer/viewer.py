@@ -16,6 +16,11 @@ class Viewer:
             slider_range=slider_range,
             rotation_slider_range=rotation_slider_range,
         )
+        # self.hand_pose_panel_kinematics = GlfwTargetPanel(
+        #     initial_target_pos,
+        #     slider_range=slider_range,
+        #     rotation_slider_range=rotation_slider_range,
+        # )
 
         if not glfw.init():
             raise RuntimeError("Failed to initialize GLFW")

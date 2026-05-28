@@ -2,14 +2,12 @@ import time
 
 import glfw
 import mujoco
-import numpy as np
 
 from sim.model.motion.trajectory import interpolate_position
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints
 from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
-# from sim_with_mujoco.mjcf import parser
 
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
 
@@ -135,15 +133,15 @@ def main():
     trajectory_goal = initial_target_pos.copy()
     current_target = initial_target_pos.copy()
     trajectory_start_time = None
-    trajectory_duration = 1.0
+    trajectory_duration = 0.05  # poll_interval과 같이 고려
 
     try:
         while not glfw.window_should_close(window):  # 렌더링 루프
             glfw.poll_events()
 
-            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 주기 분리
+            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. mj_step() 자체 주기 분리
             # 주기 관리: 반복문 / 조건문
-            poll_interval = 0.05
+            poll_interval = 0.1
             last_poll_time = 0.0
             now = time.time()
             polled_target = None
@@ -186,11 +184,12 @@ def main():
 
                 q_des, joint_ids = solve_ik(model, data, body_id, new_target, True)
                 actuator_ids = actuator_ids_from_joints(model, joint_ids)
-                for joint_id in joint_ids:
-                    joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
-                    actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-                    if actuator_id < 0:
-                        continue
+
+                for i in range(1):  # 수정 예정
+                    # joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
+                    # actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+                    # if actuator_id < 0:
+                    #     continue
 
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
                     # 옵션 1: dynamic update
@@ -203,11 +202,9 @@ def main():
                     #     qadr = model.jnt_qposadr[joint_id]
                     #     data.qpos[qadr] = q_des[qadr]
 
-                    data.qvel[:] = 0.0
+                    # data.qvel[:] = 0.0 # 옵션 2
                     mujoco.mj_step(model, data)  # 옵션 1
                     # mujoco.mj_forward(model, data) # 옵션 2
-
-                # mujoco.mj_step(model, data)
 
             width, height = glfw.get_framebuffer_size(window)
             viewport = mujoco.MjrRect(0, 0, width, height)
