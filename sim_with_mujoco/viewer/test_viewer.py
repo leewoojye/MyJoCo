@@ -7,6 +7,7 @@ import numpy as np
 from sim.model.motion.trajectory import interpolate_position
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.math3d import get_body_T
+from sim_with_mujoco.utils.mj import actuator_ids_from_joints
 from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
 # from sim_with_mujoco.mjcf import parser
 
@@ -182,24 +183,29 @@ def main():
                 #     trajectory_start, trajectory_goal, trajectory_duration, time.time() - step_start
                 # )
                 # new_target[:3, 3] = target_i
+
                 q_des, joint_ids = solve_ik(model, data, body_id, new_target, True)
+                actuator_ids = actuator_ids_from_joints(model, joint_ids)
                 for joint_id in joint_ids:
                     joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
                     actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
                     if actuator_id < 0:
                         continue
 
-                    # IK solver result(목표 관절각)를 actuator 제어 입력으로 넣음
-                    # 옵션 1
-                    # qadr = model.jnt_qposadr[joint_id]
-                    # data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
-                    # 옵션 2
-                    for joint_id in joint_ids:
-                        qadr = model.jnt_qposadr[joint_id]
-                        data.qpos[qadr] = q_des[qadr]
+                    # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
+                    # 옵션 1: dynamic update
+                    for actuator_id in actuator_ids:
+                        jid = model.actuator_trnid[actuator_id, 0]
+                        qadr = model.jnt_qposadr[jid]
+                        data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
+                    # 옵션 2: kinematic update (테스트용)
+                    # for joint_id in joint_ids:
+                    #     qadr = model.jnt_qposadr[joint_id]
+                    #     data.qpos[qadr] = q_des[qadr]
 
                     data.qvel[:] = 0.0
-                    mujoco.mj_forward(model, data)
+                    mujoco.mj_step(model, data)  # 옵션 1
+                    # mujoco.mj_forward(model, data) # 옵션 2
 
                 # mujoco.mj_step(model, data)
 
