@@ -17,23 +17,20 @@ def interpolate_finger(model, data, alpha):
         joint_name = f"finger_r_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-        qpos_index = model.jnt_qposadr[joint_id]
+        qadr = model.jnt_qposadr[joint_id]
         value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
-        data.qpos[qpos_index] = value
-        data.ctrl[actuator_id] = data.qpos[qpos_index]
+        data.qpos[qadr] = value
+        data.ctrl[actuator_id] = value
+        # data.ctrl[actuator_id] = data.qpos[qpos_index]
     # 네 손가락 관절 보간
     for i in range(5, 21):
         joint_name = f"finger_r_joint{i}"
-        joint_id = mujoco.mj_name2id(
-            model,
-            mujoco.mjtObj.mjOBJ_JOINT,
-            joint_name,
-        )
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         q_closed = model.jnt_range[joint_id, 1]
-        qpos_index = model.jnt_qposadr[joint_id]
+        qadr = model.jnt_qposadr[joint_id]
         value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-        data.qpos[qpos_index] = value
+        data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
     return
 

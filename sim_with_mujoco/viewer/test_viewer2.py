@@ -71,6 +71,11 @@ def main():
     last_poll_time = 0.0
     sim_steps_per_frame = 8
 
+    # 입력 정보 관리
+    polled_target = None
+    target_R = None
+    alpha = np.zeros(2)
+
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프
             glfw.poll_events()
@@ -80,9 +85,9 @@ def main():
             # poll_interval = 0.1
             # last_poll_time = 0.0
             now = time.time()
-            polled_target = None
-            target_R = None
-            alpha = np.zeros(2)
+            # polled_target = None
+            # target_R = None
+            # alpha = np.zeros(2)
 
             # if now - last_poll_time >= poll_interval:
             #     polled_target = hand_pose_panel.poll_target(window)  # polling 방식
@@ -100,7 +105,7 @@ def main():
                 target_R = get_body_T(env.data, env.ee_body_id)[:3, :3] @ target_rot
 
                 # hand grasp 입력 반영
-                alpha[:] = [polled_target[0], polled_target[1]]
+                alpha[:] = [polled_target[6], polled_target[7]]
 
                 trajectory_start_time = time.time()
                 last_poll_time = now
