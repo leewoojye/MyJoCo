@@ -193,12 +193,12 @@ def main():
                     #     continue
 
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
-                    # 옵션 1: dynamic update
+                    # 옵션 1: dynamic update (dynamic simulation)
                     for actuator_id in actuator_ids:
                         jid = model.actuator_trnid[actuator_id, 0]
                         qadr = model.jnt_qposadr[jid]
                         data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
-                    # 옵션 2: kinematic update (테스트용)
+                    # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:
                     #     qadr = model.jnt_qposadr[joint_id]
                     #     data.qpos[qadr] = q_des[qadr]

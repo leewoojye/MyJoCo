@@ -2,14 +2,15 @@ import time
 
 import glfw
 import mujoco
+import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import interpolate_position, interpolate_position_simple
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.ik import solve_ik
+from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints
-from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
 
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
 
@@ -80,6 +81,8 @@ def main():
             # last_poll_time = 0.0
             now = time.time()
             polled_target = None
+            target_R = None
+            alpha = np.zeros(2)
 
             # if now - last_poll_time >= poll_interval:
             #     polled_target = hand_pose_panel.poll_target(window)  # polling 방식
@@ -90,9 +93,14 @@ def main():
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
+
+                # rpy 입력 반영
                 target_rpy = polled_target[3:]
                 target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
-                # target_rot = get_body_T(data, )
+                target_R = get_body_T(env.data, env.ee_body_id)[:3, :3] @ target_rot
+
+                # hand grasp 입력 반영
+                alpha[:] = [polled_target[0], polled_target[1]]
 
                 trajectory_start_time = time.time()
                 last_poll_time = now
@@ -119,26 +127,30 @@ def main():
 
             new_target = initial_pose.copy()
             new_target[:3, 3] = current_target
+            if target_R is not None:
+                new_target[:3, :3] = target_R
 
             step_start_time = time.time()
 
-            # while time.time() - step_start_time <= 1.0 / 60.0:  # 시뮬레이션 루프
+            # while time.time() - step_start_time <= 1.0 / 60.0:
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 q_des, joint_ids = solve_ik(env.model, env.data, env.ee_body_id, new_target, True, ik_joint_names)
                 actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 
                 for i in range(1):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
-                    # 옵션 1: dynamic update
+                    # 옵션 1: dynamic update (dynamic simulation)
                     for actuator_id in actuator_ids:
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
                         env.data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
-                    # 옵션 2: kinematic update (테스트용)
+                    # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:
                     #     qadr = model.jnt_qposadr[joint_id]
                     #     data.qpos[qadr] = q_des[qadr]
 
+                    # 손가락 위치 보간
+                    interpolate_finger(env.model, env.data, alpha)
                     # 옵션 1
                     mujoco.mj_forward(env.model, env.data)
                     env.data.qfrc_applied[:] = 0.0

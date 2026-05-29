@@ -4,13 +4,19 @@ import numpy as np
 
 
 class GlfwTargetPanel:
-    AXES = ("dX", "dY", "dZ", "Roll", "Pitch", "Yaw")
+    AXES = ("dX", "dY", "dZ", "Roll", "Pitch", "Yaw", "thumb", "finger")
 
-    def __init__(self, initial_target, slider_range=(-0.2, 0.2), rotation_slider_range=(-0.15, 0.15)):
-        self.base_target = np.r_[np.asarray(initial_target, dtype=float).reshape(3), np.zeros(3)]
-        self.offset = np.zeros(6)
+    def __init__(
+        self,
+        initial_target,
+        slider_range=(-0.2, 0.2),
+        rotation_slider_range=(-0.15, 0.15),
+        grasp_slider_range=(0.0, 1.0),
+    ):
+        self.base_target = np.r_[np.asarray(initial_target, dtype=float).reshape(3), np.zeros(len(self.AXES) - 3)]
+        self.offset = np.zeros(len(self.AXES))
         self.target = self.base_target.copy()
-        self.ranges = [slider_range] * 3 + [rotation_slider_range] * 3
+        self.ranges = [slider_range] * 3 + [rotation_slider_range] * 3 + [grasp_slider_range] * 2
         self.drag_index = None
         self.changed = False
 
@@ -44,22 +50,26 @@ class GlfwTargetPanel:
             y = height - 50 - i * 35
             x = width - 300
 
-            mujoco.mjr_label(
-                mujoco.MjrRect(x, y, 80, 25),
-                mujoco.mjtFont.mjFONT_NORMAL,
-                axis,
+            mujoco.mjr_rectangle(
+                mujoco.MjrRect(x, y, 95, 28),
                 0.1,
                 0.1,
                 0.1,
                 0.8,
-                1.0,
-                1.0,
-                1.0,
+            )
+            mujoco.mjr_text(
+                mujoco.mjtFont.mjFONT_NORMAL,
+                axis,
                 context,
+                0.1,
+                0.15,
+                1.0,
+                1.0,
+                1.0,
             )
 
             mujoco.mjr_rectangle(
-                mujoco.MjrRect(x + 90, y + 10, 160, 5),
+                mujoco.MjrRect(x + 110, y + 10, 160, 5),
                 0.4,
                 0.4,
                 0.4,
@@ -68,7 +78,7 @@ class GlfwTargetPanel:
 
             lo, hi = self.ranges[i]
             t = (self.offset[i] - lo) / (hi - lo)
-            knob_x = int(x + 90 + t * 160)
+            knob_x = int(x + 110 + t * 160)
 
             mujoco.mjr_rectangle(
                 mujoco.MjrRect(knob_x - 4, y + 2, 8, 20),
@@ -81,10 +91,10 @@ class GlfwTargetPanel:
     def _hit_slider(self, mouse_x, mouse_y):
         width, height = glfw.get_framebuffer_size(glfw.get_current_context())
 
-        for i in range(6):
+        for i in range(len(self.AXES)):
             y = height - 50 - i * 35
             x = width - 300
-            if x + 90 <= mouse_x <= x + 250 and y <= mouse_y <= y + 25:
+            if x + 110 <= mouse_x <= x + 270 and y <= mouse_y <= y + 28:
                 return i
 
         return None
@@ -94,7 +104,7 @@ class GlfwTargetPanel:
         x = width - 300
 
         lo, hi = self.ranges[index]
-        t = np.clip((mouse_x - (x + 90)) / 160, 0.0, 1.0)
+        t = np.clip((mouse_x - (x + 110)) / 160, 0.0, 1.0)
         value = lo + t * (hi - lo)
 
         self.offset[index] = value
