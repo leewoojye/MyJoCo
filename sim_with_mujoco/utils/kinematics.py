@@ -21,7 +21,6 @@ def interpolate_finger(model, data, alpha):
         value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
         data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
-        # data.ctrl[actuator_id] = data.qpos[qpos_index]
     # 네 손가락 관절 보간
     for i in range(5, 21):
         joint_name = f"finger_r_joint{i}"

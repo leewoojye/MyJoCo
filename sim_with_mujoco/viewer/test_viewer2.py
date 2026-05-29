@@ -65,11 +65,12 @@ def main():
     trajectory_goal = initial_target_pos.copy()
     current_target = initial_target_pos.copy()
     trajectory_start_time = None
-    trajectory_duration = 0.05  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기
+    trajectory_duration = 0.05  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
 
     poll_interval = 0.1
     last_poll_time = 0.0
     sim_steps_per_frame = 1
+    steps_per_sim = 20
 
     # 입력 정보 관리
     polled_target = None
@@ -155,12 +156,12 @@ def main():
                     #     data.qpos[qadr] = q_des[qadr]
 
                     # 손가락 위치 보간
-                    interpolate_finger(env.model, env.data, alpha)
+                    interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
                     # 옵션 1
-                    mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
-                    env.data.qfrc_applied[:] = 0.0
-                    env.data.qfrc_applied[:] = env.data.qfrc_bias
-                    env.step(8)
+                    # mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
+                    # env.data.qfrc_applied[:] = 0.0
+                    # env.data.qfrc_applied[:] = env.data.qfrc_bias
+                    env.step(steps_per_sim)
                     # mujoco.mj_step(
                     #     env.model, env.data
                     # )  #  중력항 상쇠를 위한 보정항, 현재 joint-space와 달리 task-space에서는 damping이 이루어지지 않고 있음

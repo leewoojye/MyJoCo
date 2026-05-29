@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.transform import Rotation, Slerp
 
 
 # time-scaling s(t): [0,T]->[0,1]
@@ -33,13 +34,14 @@ def quintic_time_scaling(T, t):
 
 
 def interpolate_position(p_start, p_end, T, t):
-    s_t, s_dot_t, s_ddot_t = cubic_time_scaling(T, t)
+    s_t, _, _ = cubic_time_scaling(T, t)
     # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
     p_current = p_start + s_t * (p_end - p_start)
 
     return p_current
 
 
+# 단순 선형 위치 보간
 def interpolate_position_simple(p_start, p_end, T, t):
     scaled_t = t / T
     p_current = p_start + scaled_t * (p_end - p_start)
@@ -47,8 +49,15 @@ def interpolate_position_simple(p_start, p_end, T, t):
     return p_current
 
 
-def interpolate_pose(p_start, p_end, T, t):
-    return
+# 회전 보간
+def interpolate_rotation(r_start, r_end, T, t):
+    s_t, _, _ = cubic_time_scaling(T, t)
+    s_t = np.clip(s_t, 0.0, 1.0)
+
+    key_rots = Rotation.from_matrix([r_start, r_end])
+    slerp = Slerp([0.0, 1.0], key_rots)
+
+    return slerp([s_t]).as_matrix()[0]
 
 
 # def trajectory_generator(p_start, p_end, T, dt):
