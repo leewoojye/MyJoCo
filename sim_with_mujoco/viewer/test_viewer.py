@@ -13,36 +13,6 @@ from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
 
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
 
-# # 1. GLFW window / OpenGL context 생성
-# window = glfw.create_window(1200, 900, "Demo", None, None)
-# glfw.make_context_current(window)
-
-# # 2. MuJoCo visualization objects
-# cam = mujoco.MjvCamera()
-# opt = mujoco.MjvOption()
-# scene = mujoco.MjvScene(model, maxgeom=10000)
-# context = mujoco.MjrContext(model, mujoco.mjtFontScale.mjFONTSCALE_150)
-
-# # 3. 매 프레임
-# mujoco.mj_step(model, data)
-
-# viewport = mujoco.MjrRect(0, 0, width, height)
-
-# mujoco.mjv_updateScene(
-#     model,
-#     data,
-#     opt,
-#     None,
-#     cam,
-#     mujoco.mjtCatBit.mjCAT_ALL,
-#     scene,
-# )
-
-# mujoco.mjr_render(viewport, scene, context)
-
-# glfw.swap_buffers(window)
-# glfw.poll_events()
-
 
 def main():
     initial_qpos = {

@@ -4,6 +4,7 @@ from typing import Callable, NamedTuple, Optional, Union
 import mujoco
 import numpy as np
 from sim_with_mujoco.mjcf.parser import parser
+from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.viewer.viewer import Viewer
 
 
@@ -53,7 +54,7 @@ class Environment:
         mujoco.mj_forward(self.model, self.data)
         # 초기 목표 위치 및 자세 저장
         self.initial_target_pos = self.data.xpos[self.ee_body_id].copy()
-        self.initial_pose = self.get_body_T(self.data, self.ee_body_id)
+        self.initial_pose = get_body_T(self.data, self.ee_body_id)
         return
 
     def step(self, nstep=1):
@@ -87,17 +88,17 @@ class Environment:
         return
 
     # transformation matrix getter: data.xpos + data.xmat
-    def get_space_T(self, site_id):
-        T = np.eye(4)  # 4x4 단위행렬 생성
-        T[:3, :3] = self.data.xpos[site_id]
-        T[:3, 3] = self.data.xmat[site_id].reshape(3, 3)
-        return T
+    # def get_space_T(self, site_id):
+    #     T = np.eye(4)  # 4x4 단위행렬 생성
+    #     T[:3, :3] = self.data.xpos[site_id]
+    #     T[:3, 3] = self.data.xmat[site_id].reshape(3, 3)
+    #     return T
 
-    def get_body_T(self, body_id):
-        T = np.eye(4)  # 4x4 단위행렬 생성
-        T[:3, :3] = self.data.xpos[body_id]
-        T[:3, 3] = self.data.xmat[body_id].reshape(3, 3)
-        return T
+    # def get_body_T(self, body_id):
+    #     T = np.eye(4)  # 4x4 단위행렬 생성
+    #     T[:3, :3] = self.data.xpos[body_id]
+    #     T[:3, 3] = self.data.xmat[body_id].reshape(3, 3)
+    #     return T
 
     # rotation matrix getter
     def get_rotation():
