@@ -48,6 +48,13 @@ def main():
 
     ik_joint_names = [
         "lift_joint",
+        "arm_l_joint1",
+        "arm_l_joint2",
+        "arm_l_joint3",
+        "arm_l_joint4",
+        "arm_l_joint5",
+        "arm_l_joint6",
+        "arm_l_joint7",
         "arm_r_joint1",
         "arm_r_joint2",
         "arm_r_joint3",
@@ -78,7 +85,7 @@ def main():
     alpha = np.zeros(2)
 
     try:
-        while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프
+        while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
             glfw.poll_events()
 
             # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
@@ -89,7 +96,6 @@ def main():
             # alpha = np.zeros(2)
 
             polled_target = env.viewer.hand_pose_panel.poll_target(env.viewer.window)  # 매 프레임마다 입력 처리
-            # if polled_target is not None and now - last_poll_time >= poll_interval:
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -133,7 +139,16 @@ def main():
                 if target_R is not None:
                     new_target[:3, :3] = target_R
 
-                q_des, joint_ids = solve_ik(env.model, env.data, env.ee_body_id, new_target, True, ik_joint_names)
+                left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
+                left_target = get_body_T(env.data, left_hand_id)
+                q_des, joint_ids = solve_ik(
+                    env.model,
+                    env.data,
+                    [(env.ee_body_id, new_target), (left_hand_id, left_target)],
+                    is_pose=[True, False],
+                    joint_names=ik_joint_names,
+                    check_collision=True,
+                )
                 actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 
                 for i in range(1):  # 수정 예정

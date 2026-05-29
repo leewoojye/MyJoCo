@@ -90,12 +90,7 @@ def main():
             # target_R = None
             # alpha = np.zeros(2)
 
-            # if now - last_poll_time >= poll_interval:
-            #     polled_target = hand_pose_panel.poll_target(window)  # polling 방식
-            #     last_poll_time = now
-
             polled_target = env.viewer.hand_pose_panel.poll_target(env.viewer.window)  # 매 프레임마다 입력 처리
-            # if polled_target is not None and now - last_poll_time >= poll_interval:
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -159,11 +154,9 @@ def main():
                     # 옵션 1
                     # mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
                     # env.data.qfrc_applied[:] = 0.0
-                    # env.data.qfrc_applied[:] = env.data.qfrc_bias
+                    # env.data.qfrc_applied[:] = env.data.qfrc_bias #  중력항 상쇠를 위한 보정항, 현재 joint-space와 달리 task-space에서는 damping이 이루어지지 않고 있음
                     env.step(steps_per_sim)
-                    # mujoco.mj_step(
-                    #     env.model, env.data
-                    # )  #  중력항 상쇠를 위한 보정항, 현재 joint-space와 달리 task-space에서는 damping이 이루어지지 않고 있음
+                    # mujoco.mj_step(env.model, env.data)
                     # 옵션 2
                     # data.qvel[:] = 0.0
                     # mujoco.mj_forward(model, data)
