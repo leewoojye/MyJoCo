@@ -69,7 +69,7 @@ def main():
 
     poll_interval = 0.1
     last_poll_time = 0.0
-    sim_steps_per_frame = 1
+    sim_steps_per_frame = 4
 
     # 입력 정보 관리
     polled_target = None
@@ -160,10 +160,9 @@ def main():
                     mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
                     env.data.qfrc_applied[:] = 0.0
                     env.data.qfrc_applied[:] = env.data.qfrc_bias
-                    env.step(8)
-                    # mujoco.mj_step(
-                    #     env.model, env.data
-                    # )  #  중력항 상쇠를 위한 보정항, 현재 joint-space와 달리 task-space에서는 damping이 이루어지지 않고 있음
+                    mujoco.mj_step(
+                        env.model, env.data
+                    )  #  중력항 상쇠를 위한 보정항, 현재 joint-space와 달리 task-space에서는 damping이 이루어지지 않고 있음
                     # 옵션 2
                     # data.qvel[:] = 0.0
                     # mujoco.mj_forward(model, data)

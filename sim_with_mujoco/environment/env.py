@@ -57,6 +57,7 @@ class Environment:
         self.initial_pose = get_body_T(self.data, self.ee_body_id)
         return
 
+    # step() wrapper
     def step(self, nstep=1):
         mujoco.mj_step(self.model, self.data, nstep)
         return
