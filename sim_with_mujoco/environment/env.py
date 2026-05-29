@@ -3,7 +3,8 @@
 from typing import Callable, NamedTuple, Optional, Union
 import mujoco
 import numpy as np
-from sim_with_mujoco.mjcf import parser
+from sim_with_mujoco.mjcf.parser import parser
+from sim_with_mujoco.viewer.viewer import Viewer
 
 
 class Environment:
@@ -27,6 +28,7 @@ class Environment:
             mujoco.mjtObj.mjOBJ_BODY,
             end_effector,
         )
+        self.viewer = Viewer(self.model, self.data)
 
     def get_ctrl(self):
         return self.data.ctrl
@@ -36,14 +38,33 @@ class Environment:
         np.copyto(self.data.ctrl, ctrl)
         return
 
+    def initial_qpos(self, q_des: dict):  # qpos 초기화, qpos/ctrl 모두 고려
+        # self.data.qpos[:] = qpos
+        # mujoco.mj_forward(self.model, self.data)
+
+        for name, value in q_des.items():
+            joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
+            actuator_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
+            qadr = self.model.jnt_qposadr[joint_id]
+            self.data.qpos[qadr] = value
+            self.data.ctrl[actuator_id] = self.data.qpos[qadr]
+
+        # qpos/qvel/ctrl 기준으로 kinematics + velocity, force, qacc 등등 계산
+        mujoco.mj_forward(self.model, self.data)
+        # 초기 목표 위치 및 자세 저장
+        self.initial_target_pos = self.data.xpos[self.ee_body_id].copy()
+        self.initial_pose = self.get_body_T(self.data, self.ee_body_id)
+        return
+
     def step(self, nstep=1):
         mujoco.mj_step(self.model, self.data, nstep)
         return
 
-    def render():
+    def render(self):  # rendering wrapper
         # 렌더링 주기 - 시뮬레이션 주기 분리
         # viewer 인스턴스의 render api 호출해서 window buffer 업데이트
         # 렌더링 로직은 viewer 인스턴스에서 전담하고 env.render()는 wrapper 용도
+        self.viewer.render()
         return
 
     def get_state():
@@ -90,4 +111,7 @@ class Environment:
         # ik solver 호출 (보류)
         self.data.qpos = qpos
         mujoco.mj_forward(self.model, self.data)
+        return
+
+    def ik_wrapper():
         return

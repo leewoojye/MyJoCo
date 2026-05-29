@@ -40,6 +40,13 @@ def interpolate_position(p_start, p_end, T, t):
     return p_current
 
 
+def interpolate_position_simple(p_start, p_end, T, t):
+    scaled_t = t / T
+    p_current = p_start + scaled_t * (p_end - p_start)
+
+    return p_current
+
+
 def interpolate_pose(p_start, p_end, T, t):
     return
 

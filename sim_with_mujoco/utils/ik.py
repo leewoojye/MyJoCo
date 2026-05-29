@@ -97,10 +97,10 @@ def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None):  #
             if model.jnt_limited[jid]:
                 q_lower, q_upper = model.jnt_range[jid]
                 ik_data.qpos[qadr] = np.clip(ik_data.qpos[qadr], q_lower, q_upper)
+            mujoco.mj_forward(model, ik_data)
 
-        # 각변위만큼 이동
-        mujoco.mj_forward(model, ik_data)
-        # if is_collision(model, ik_data):  # forward한 결과가 penetration이면 이전 qpos로 rollback
+        # mujoco.mj_forward(model, ik_data)
+        # if is_collision(model, ik_data):  # forward 결과가 penetration이면 이전 qpos로 rollback
         #     mujoco.mj_copyData(ik_data, model, prev_data)
         #     mujoco.mj_forward(model, ik_data)
         T_sb = get_body_T(ik_data, body_id)

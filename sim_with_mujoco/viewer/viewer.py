@@ -6,7 +6,7 @@ from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
 
 # mujoco viewer + target panel 통합
 class Viewer:
-    def __init__(self, model, data):
+    def __init__(self, model, data): # 참조 전달
         self.model = model
         self.data = data
 
