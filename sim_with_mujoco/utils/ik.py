@@ -16,7 +16,7 @@ def damped_pseudoinverse(J, damping=1e-3):
 # body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "arm")
 # joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
 # site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
-def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None):  # 비고: site_id
+def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None, check_collision=False):  # 비고: site_id
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
 
     # 복원용 MjData 저장
@@ -24,7 +24,7 @@ def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None):  #
     prev_data.qpos[:] = data.qpos  # 값복사
     prev_data.qvel[:] = data.qvel
 
-    # IK 결과 반환용 MjData
+    # IK 결과 반환용 MjData, 기존 data 변화 없이 결과 qpos만 반환하기 위함
     ik_data = mujoco.MjData(model)
     ik_data.qpos[:] = data.qpos
     ik_data.qvel[:] = data.qvel
@@ -100,9 +100,11 @@ def solve_ik(model, data, body_id, target_T, is_pose=True, joint_names=None):  #
             mujoco.mj_forward(model, ik_data)
 
         # mujoco.mj_forward(model, ik_data)
-        # if is_collision(model, ik_data):  # forward 결과가 penetration이면 이전 qpos로 rollback
-        #     mujoco.mj_copyData(ik_data, model, prev_data)
-        #     mujoco.mj_forward(model, ik_data)
+        if is_collision(model, ik_data):  # forward 결과가 penetration이면 prev_data로 rollback
+            mujoco.mj_copyData(ik_data, model, prev_data)
+        else:  # 충돌이 아니라면 prev_data 갱신
+            mujoco.mj_copyData(prev_data, model, ik_data)
+
         T_sb = get_body_T(ik_data, body_id)
 
         # forward 이후 갱신된 트위스트(위치) 오차로 종료 조건 검사 (반복문 앞에 배치해도 무관)
