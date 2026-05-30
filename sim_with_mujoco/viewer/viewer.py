@@ -1,12 +1,14 @@
 import glfw
 import mujoco
+import numpy as np
 
 from sim_with_mujoco.viewer.glfw_panel import GlfwTargetPanel
+from sim_with_mujoco.viewer.gui_panel import GUIPanel
 
 
 # mujoco viewer + target panel 통합
 class Viewer:
-    def __init__(self, model, data): # 참조 전달
+    def __init__(self, model, data):  # 참조 전달
         self.model = model
         self.data = data
 
@@ -16,6 +18,7 @@ class Viewer:
             slider_range=slider_range,
             rotation_slider_range=rotation_slider_range,
         )
+        self.gui_panel = GUIPanel(initial_camera=[180, -20, 3, 1])
 
         if not glfw.init():
             raise RuntimeError("Failed to initialize GLFW")
@@ -28,8 +31,13 @@ class Viewer:
         glfw.make_context_current(self.window)
         glfw.swap_interval(1)  # 창 갱신을 모니터 refresh 주기에 맞춤
 
+        # force = np.zeros(6)
+        # mujoco.mj_contactForce(self.model, self.data, i, force)
+
         self.cam = mujoco.MjvCamera()
-        self.opt = mujoco.MjvOption()
+        self.opt = mujoco.MjvOption()  # 시각화 대상 설정 옵션
+        self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
+        self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
         self.scene = mujoco.MjvScene(self.model, maxgeom=10000)
         self.context = mujoco.MjrContext(
             self.model,
@@ -41,12 +49,22 @@ class Viewer:
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         self.cam.lookat[:] = [0, 0, 1.0]
         self.cam.distance = 3.0
-        self.cam.azimuth = 90
+        self.cam.azimuth = 180
         self.cam.elevation = -20
 
-    # poll_target wrapper
+    # polling wrapper
+    # panel 입력을 polling으로 가져와서 viewer option을 갱신
     def poll_target(self):
-        return self.hand_pose_panel.poll_target(self.window)
+        polled_target = self.hand_pose_panel.poll_target(self.window)
+        polled_camera = self.gui_panel.poll_camera(self.window)
+
+        if polled_camera is not None:
+            self.cam.azimuth = polled_camera[0]
+            self.cam.elevation = polled_camera[1]
+            self.cam.distance = polled_camera[2]
+            self.cam.lookat[2] = polled_camera[3]
+
+        return polled_target, polled_camera
 
     def render(self):
         self.width, self.height = glfw.get_framebuffer_size(self.window)
@@ -65,6 +83,7 @@ class Viewer:
         # 다음 화면을 그려 버퍼에 저장
         mujoco.mjr_render(self.viewport, self.scene, self.context)
         self.hand_pose_panel.render(self.window, self.context)
+        self.gui_panel.render(self.window, self.context)
 
         # GLFW/OpenGL - double buffering
         # render()가 그린 화면을 비로소 창에 띄움

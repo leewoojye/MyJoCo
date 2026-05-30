@@ -95,7 +95,7 @@ def main():
             # target_R = None
             # alpha = np.zeros(2)
 
-            polled_target = env.viewer.hand_pose_panel.poll_target(env.viewer.window)  # 매 프레임마다 입력 처리
+            polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -176,8 +176,9 @@ def main():
                     # env.step(steps_per_sim)
                     # 옵션 2
                     env.data.qvel[:] = 0.0
-                    # mujoco.mj_forward(env.model, env.data)
-                    env.step(steps_per_sim)
+                    mujoco.mj_forward(env.model, env.data)
+                    env.data.time += env.model.opt.timestep  # 시뮬레이션 시간 증가 -> 렌더링 API에서 이를 반영
+                    # env.step(steps_per_sim)
 
             env.viewer.render()
 

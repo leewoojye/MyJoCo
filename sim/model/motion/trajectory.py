@@ -41,6 +41,13 @@ def interpolate_position(p_start, p_end, T, t):
     return p_current
 
 
+def interpolate_position_quintic(p_start, p_end, T, t):
+    s_t, _, _ = quintic_time_scaling(T, t)
+    p_current = p_start + s_t * (p_end - p_start)
+
+    return p_current
+
+
 # 단순 선형 위치 보간
 def interpolate_position_simple(p_start, p_end, T, t):
     scaled_t = t / T

@@ -8,6 +8,7 @@ import numpy as np
 # c.friction: friction parameters
 
 
+# 1. kinematic simulation에서 hand-can 충돌 감지 용도
 def is_hand_finger_contact(body1, body2):
     pair = {body1, body2}
 
