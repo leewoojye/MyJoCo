@@ -121,7 +121,7 @@ class Environment:
         return
 
     # pose(6D) 기준 task-space x를 joint space q로 변환
-    def task_to_joint_space(self, x_dot_des, x_ddot_des, joint_ids):
+    def task_to_joint_space(self, p_dot_des, p_ddot_des, joint_ids):
         dof_ids = dof_ids_from_joints(self.model, joint_ids)
 
         jacp = np.zeros((3, self.model.nv))
@@ -137,13 +137,13 @@ class Environment:
         J = np.vstack([jacr, jacp])[:, dof_ids]
         J_dot = np.vstack([jacr_dot, jacp_dot])[:, dof_ids]
 
-        x_dot_des = np.r_[np.zeros(3), x_dot_des] # angular 부분이 0 (추후 수정)
-        x_ddot_des = np.r_[np.zeros(3), x_ddot_des]
+        p_dot_des = np.r_[np.zeros(3), p_dot_des]  # angular 부분이 0 (추후 수정)
+        p_ddot_des = np.r_[np.zeros(3), p_ddot_des]
 
         qvel = self.data.qvel[dof_ids]
 
         J_inv = damped_pseudoinverse(J, 1e-3)
 
-        qdot_des = J_inv @ x_dot_des
-        qddot_des = J_inv @ (x_ddot_des - J_dot @ qvel)
+        qdot_des = J_inv @ p_dot_des
+        qddot_des = J_inv @ (p_ddot_des - J_dot @ qvel)
         return qdot_des, qddot_des
