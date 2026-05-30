@@ -4,7 +4,9 @@ from typing import Callable, NamedTuple, Optional, Union
 import mujoco
 import numpy as np
 from sim_with_mujoco.mjcf.parser import parser
+from sim_with_mujoco.utils.ik import damped_pseudoinverse
 from sim_with_mujoco.utils.math3d import get_body_T
+from sim_with_mujoco.utils.mj import dof_ids_from_joints
 from sim_with_mujoco.viewer.viewer import Viewer
 
 
@@ -117,3 +119,31 @@ class Environment:
 
     def ik_wrapper():
         return
+
+    # pose(6D) 기준 task-space x를 joint space q로 변환
+    def task_to_joint_space(self, x_dot_des, x_ddot_des, joint_ids):
+        dof_ids = dof_ids_from_joints(self.model, joint_ids)
+
+        jacp = np.zeros((3, self.model.nv))
+        jacr = np.zeros((3, self.model.nv))
+        jacp_dot = np.zeros((3, self.model.nv))
+        jacr_dot = np.zeros((3, self.model.nv))
+
+        ee_pos = self.data.xpos[self.ee_body_id].copy()
+
+        mujoco.mj_jacBody(self.model, self.data, jacp, jacr, self.ee_body_id)
+        mujoco.mj_jacDot(self.model, self.data, jacp_dot, jacr_dot, ee_pos, self.ee_body_id)
+
+        J = np.vstack([jacr, jacp])[:, dof_ids]
+        J_dot = np.vstack([jacr_dot, jacp_dot])[:, dof_ids]
+
+        x_dot_des = np.r_[np.zeros(3), x_dot_des] # angular 부분이 0 (추후 수정)
+        x_ddot_des = np.r_[np.zeros(3), x_ddot_des]
+
+        qvel = self.data.qvel[dof_ids]
+
+        J_inv = damped_pseudoinverse(J, 1e-3)
+
+        qdot_des = J_inv @ x_dot_des
+        qddot_des = J_inv @ (x_ddot_des - J_dot @ qvel)
+        return qdot_des, qddot_des

@@ -33,19 +33,22 @@ def quintic_time_scaling(T, t):
     return s_t, s_dot_t, s_ddot_t
 
 
-def interpolate_position(p_start, p_end, T, t):
-    s_t, _, _ = cubic_time_scaling(T, t)
+def interpolate_position(p_start, p_end, T, t, return_acc=False):
+    s_t, _, s_ddot_t = cubic_time_scaling(T, t)
     # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
     p_current = p_start + s_t * (p_end - p_start)
-
+    if return_acc:
+        return p_current, s_ddot_t
     return p_current
 
 
 def interpolate_position_quintic(p_start, p_end, T, t):
-    s_t, _, _ = quintic_time_scaling(T, t)
+    s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
     p_current = p_start + s_t * (p_end - p_start)
+    p_dot_current = s_dot_t * (p_end - p_start)
+    p_dotdot_current = s_ddot_t * (p_end - p_start)
 
-    return p_current
+    return p_current, p_dot_current, p_dotdot_current
 
 
 # 단순 선형 위치 보간

@@ -8,6 +8,7 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import interpolate_position, interpolate_position_quintic, interpolate_position_simple
 from sim_with_mujoco.environment.env import Environment
+from sim_with_mujoco.utils.dynamics import pd_controller
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
@@ -127,24 +128,24 @@ def main():
                         current_target = trajectory_goal.copy()
                         trajectory_start_time = None
                     else:
-                        current_target = interpolate_position(  # cubic time-scaling
-                            trajectory_start,
-                            trajectory_goal,
-                            trajectory_duration,
-                            t,
-                        )
+                        # current_target, qacc_des = interpolate_position(  # cubic time-scaling
+                        #     trajectory_start, trajectory_goal, trajectory_duration, t, True
+                        # )
                         # current_target = interpolate_position_simple(  # 선형 보간
                         #     trajectory_start,
                         #     trajectory_goal,
                         #     trajectory_duration,
                         #     t,
                         # )
-                        # current_target = interpolate_position_quintic(
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
+                        current_target, p_dot_des, p_dotdot_des = interpolate_position_quintic(
+                            trajectory_start,
+                            trajectory_goal,
+                            trajectory_duration,
+                            t,
+                        )
+
+                # qdot_des = pinv(J) @ p_dot_des
+                # qddot_des = pinv(J) @ (p_ddot_des - Jdot_qdot)
 
                 new_target = initial_pose.copy()
                 new_target[:3, 3] = current_target
@@ -185,6 +186,13 @@ def main():
                     # 옵션 1
                     mujoco.mj_copyData(temp_data, env.model, env.data)
                     mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
+
+                    # PD controller
+                    tau_des = pd_controller(
+                        env.model,
+                        env.data,
+                        q_des,
+                    )
                     env.data.qfrc_applied[dof_ids] = 0.0
                     env.data.qfrc_applied[dof_ids] = temp_data.qfrc_bias[dof_ids]
                     env.step(steps_per_sim)
