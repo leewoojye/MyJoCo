@@ -1,6 +1,9 @@
 import mujoco
 
 
+# joint id: 관절 정보 인덱스 (model.jnt_*)
+# dof id: 속도, 가속도, generalized force 인덱스 (data.qvel, data.qacc, data.qfrc_applied, data.qfrc_bias)
+# actuator id: 제어 입력 인덱스 (data.ctrl, model.actuator_*)
 def actuator_ids_from_joints(model, joint_ids):
     joint_id_set = set(joint_ids)
     actuator_ids = []

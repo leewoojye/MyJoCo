@@ -6,9 +6,7 @@
 ### 26/05/13
 https://youtu.be/gHD_W7J2Uig
 
-00:00 ~ 01:00 Kinematic Simulator Demo
-
-01:00 ~ 02:00 Dynamic Simulator Demo
+캔과 손가락 사이의 접촉, 캔의 밀림이 더 잘 보이는 데모영상입니다.
 
 ### 26/05/11
 https://youtu.be/q49b6CsoBwk
@@ -21,7 +19,7 @@ This project is a custom robotics simulator for experimenting with a ROBOTIS FFW
 
 The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshes, and runs a kinematics-based interaction loop.
 
-Check out the more detailed implementation journey here!
+Check out the more detailed implementation journey here! https://leewoojye.github.io/research/2026/05/02/sim_from_scratch.html
 
 ## How to Use
 
@@ -40,29 +38,23 @@ pip install -r requirements.txt
 
 Run the simulator:
 
-**Kinematic Simulator**
-
 ```bash
-python3 -m sim_with_mujoco.kinematic_simulator
-```
-
-**Dynamic Simulator**
-
-```bash
-python3 -m sim_with_mujoco.dynamic_simulator
+python3 main.py
 ```
 
 Use the right-side GUI panels to move the right hand target and control the right-hand grasp sliders.
-[update] A GUI panel for adjusting the viewpoint has been added within the viewer.
 
 ## Core Implementation
 
 | 영역 | 구현 내용 |
 | --- | --- |
+| Robot model | BodyNode, GeomRecord, RobotModel, RobotState 클래스 |
 | Math utils | rotation/transform/skew/jacobian matrix, hat 연산 등 |
+| FK | PoE 기반 recursive FK |
 | IK | position IK, pose IK |
 | Trajectory | 0.1초 cubic/quantic time scaling |
-| Collision | kinematic_simulator를 위한 충돌 처리 모듈 |
+| Collision | 손가락-캔/테이블 중심 필터링, proxy 클래스 |
+| Contact | ContactPoint 클래스, normal/tangent 벡터 계산 |
 | Grasp | alpha interpolation, form/force closure 판단 |
 | Object update | 캔 가속도, 위치 업데이트 |
 | GUI | target pose panel, grasp panel 클래스 |

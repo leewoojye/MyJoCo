@@ -71,17 +71,22 @@ def main():
     initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
 
+    # 주기 상수
+    sim_steps_per_frame = 8
+    steps_per_sim = 16
+    poll_interval = 1.0 / 60.0
+    last_poll_time = time.time()
+
     # 궤적 형성 관련 변수
     trajectory_start = initial_target_pos.copy()
     trajectory_goal = initial_target_pos.copy()
     current_target = initial_target_pos.copy()
     trajectory_start_time = None
-    trajectory_duration = 0.05  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
-
-    poll_interval = 0.1
-    last_poll_time = 0.0
-    sim_steps_per_frame = 1
-    steps_per_sim = 8
+    # trajectory_duration = (
+    #     env.model.opt.timestep * sim_steps_per_frame
+    # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
+    trajectory_duration = 0.5
+    # trajectory_duration = poll_interval
 
     # 입력 정보 관리
     polled_target = None
@@ -94,12 +99,12 @@ def main():
 
             # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
             # 주기 관리: 반복문 / 조건문
-            now = time.time()
-            # polled_target = None
-            # target_R = None
-            # alpha = np.zeros(2)
+            now = time.time()  # 절대 시간 (시뮬레이션 시간은 env.data.time)
 
+            # if now - last_poll_time >= poll_interval: # poll 주기 설정
+            last_poll_time = now
             polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+            # env.viewer.render()  # 패널 입력 실시간 반영을 위한 렌더링
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -113,9 +118,6 @@ def main():
                 alpha[:] = [polled_target[6], polled_target[7]]
 
                 trajectory_start_time = env.data.time
-                last_poll_time = now
-
-            step_start_time = time.time()
 
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 if trajectory_start_time is not None:
@@ -125,24 +127,24 @@ def main():
                         current_target = trajectory_goal.copy()
                         trajectory_start_time = None
                     else:
-                        # current_target = interpolate_position(  # cubic time-scaling
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
+                        current_target = interpolate_position(  # cubic time-scaling
+                            trajectory_start,
+                            trajectory_goal,
+                            trajectory_duration,
+                            t,
+                        )
                         # current_target = interpolate_position_simple(  # 선형 보간
                         #     trajectory_start,
                         #     trajectory_goal,
                         #     trajectory_duration,
                         #     t,
                         # )
-                        current_target = interpolate_position_quintic(
-                            trajectory_start,
-                            trajectory_goal,
-                            trajectory_duration,
-                            t,
-                        )
+                        # current_target = interpolate_position_quintic(
+                        #     trajectory_start,
+                        #     trajectory_goal,
+                        #     trajectory_duration,
+                        #     t,
+                        # )
 
                 new_target = initial_pose.copy()
                 new_target[:3, 3] = current_target
@@ -157,7 +159,7 @@ def main():
                     [(env.ee_body_id, new_target), (left_hand_id, left_target)],
                     is_pose=[True, False],
                     joint_names=ik_joint_names,
-                    check_collision=True,
+                    check_collision=False,
                 )
                 actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 
