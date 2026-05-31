@@ -107,7 +107,7 @@ def main():
 
                 now = time.time()
 
-                polled_target = None
+                # polled_target = None
                 if now - last_poll_time >= poll_interval:  # poll 주기 설정
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리

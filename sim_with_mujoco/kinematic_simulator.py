@@ -72,6 +72,14 @@ def main():
     initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
 
+    # 주기 상수
+    sim_steps_per_frame = 8
+    steps_per_sim = 1
+    poll_interval = 1.0 / 30.0
+    render_interval = 1.0 / 60.0
+    last_poll_time = time.time()
+    last_render_time = time.time()
+
     # 궤적 형성 관련 변수
     trajectory_start = initial_pose.copy()
     trajectory_goal = initial_pose.copy()
@@ -79,43 +87,44 @@ def main():
     trajectory_start_time = None
     trajectory_duration = 0.05  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
 
-    poll_interval = 0.1
-    last_poll_time = 0.0
-    sim_steps_per_frame = 8
-    steps_per_sim = 1
-
     # 입력 정보 관리
     polled_target = None
     alpha = np.zeros(2)
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
-            # glfw.poll_events()
-
-            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
-            # 주기 관리: 반복문 / 조건문
-            now = time.time()
-            # polled_target = None
-            # target_R = None
-            # alpha = np.zeros(2)
-
-            polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
-            if polled_target is not None:
-                trajectory_start = T_des.copy()
-                trajectory_goal = T_des.copy()
-                trajectory_goal[:3, 3] = polled_target[:3].copy()
-
-                # rpy 입력 반영
-                target_rpy = polled_target[3:]
-                target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
-                trajectory_goal[:3, :3] = initial_pose[:3, :3] @ target_rot
-
-                # hand grasp 입력 반영
-                alpha[:] = [polled_target[6], polled_target[7]]
-
-                trajectory_start_time = env.data.time
-
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
+                glfw.poll_events()
+
+                # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
+                # 주기 관리: 반복문 / 조건문
+                # polled_target = None
+                # target_R = None
+                # alpha = np.zeros(2)
+                now = time.time()
+
+                if now - last_poll_time >= poll_interval:  # poll 주기 설정
+                    last_poll_time = now
+                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+
+                if polled_target is not None:
+                    # trajectory_start = T_des.copy()
+                    trajectory_goal = T_des.copy()
+                    trajectory_goal[:3, 3] = polled_target[:3].copy()
+
+                    # rpy 입력 반영
+                    target_rpy = polled_target[3:]
+                    target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
+                    trajectory_goal[:3, :3] = initial_pose[:3, :3] @ target_rot
+
+                    # hand grasp 입력 반영
+                    alpha[:] = [polled_target[6], polled_target[7]]
+
+                    if trajectory_start_time is None:
+                        trajectory_start = T_des.copy()
+                        trajectory_start_time = env.data.time
+
+                # for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 if trajectory_start_time is not None:
                     t = env.data.time - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
 
@@ -144,8 +153,6 @@ def main():
 
                 new_target = T_des.copy()
 
-                # left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
-                # left_target = get_body_T(env.data, left_hand_id)
                 q_des, joint_ids = solve_ik(
                     env.model,
                     env.data,
@@ -175,7 +182,7 @@ def main():
 
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
-                    # interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
+                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
                     # mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
                     # env.data.qfrc_applied[:] = 0.0
@@ -188,7 +195,9 @@ def main():
                     env.data.time += env.model.opt.timestep  # 시뮬레이션 시간 증가 -> 렌더링 API에서 이를 반영
                     # env.step(steps_per_sim)
 
-            env.viewer.render()
+                    if now - last_render_time >= render_interval:
+                        env.viewer.render()
+                        last_render_time = now
 
     finally:
         env.viewer.terminate_viewer()
