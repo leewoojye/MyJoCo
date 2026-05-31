@@ -89,7 +89,7 @@ class Viewer:
         # render()가 그린 화면을 비로소 창에 띄움
         # step -> render -> swap -> poll
         glfw.swap_buffers(self.window)
-        glfw.poll_events()
+        # glfw.poll_events()
 
     def terminate_viewer(self):
         glfw.terminate()

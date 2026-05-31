@@ -5,7 +5,12 @@ import mujoco
 import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import interpolate_position, interpolate_position_quintic, interpolate_position_simple
+from sim.model.motion.trajectory import (
+    interpolate_pose,
+    interpolate_position,
+    interpolate_position_quintic,
+    interpolate_position_simple,
+)
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
@@ -68,9 +73,9 @@ def main():
     initial_pose = env.initial_pose
 
     # 궤적 형성 관련 변수
-    trajectory_start = initial_target_pos.copy()
-    trajectory_goal = initial_target_pos.copy()
-    current_target = initial_target_pos.copy()
+    trajectory_start = initial_pose.copy()
+    trajectory_goal = initial_pose.copy()
+    T_des = initial_pose.copy()
     trajectory_start_time = None
     trajectory_duration = 0.05  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
 
@@ -81,7 +86,6 @@ def main():
 
     # 입력 정보 관리
     polled_target = None
-    target_R = None
     alpha = np.zeros(2)
 
     try:
@@ -97,28 +101,26 @@ def main():
 
             polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
             if polled_target is not None:
-                trajectory_start = current_target.copy()
-                trajectory_goal = polled_target[:3].copy()
+                trajectory_start = T_des.copy()
+                trajectory_goal = T_des.copy()
+                trajectory_goal[:3, 3] = polled_target[:3].copy()
 
                 # rpy 입력 반영
                 target_rpy = polled_target[3:]
                 target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
-                target_R = get_body_T(env.data, env.ee_body_id)[:3, :3] @ target_rot
+                trajectory_goal[:3, :3] = initial_pose[:3, :3] @ target_rot
 
                 # hand grasp 입력 반영
                 alpha[:] = [polled_target[6], polled_target[7]]
 
                 trajectory_start_time = env.data.time
-                last_poll_time = now
-
-            step_start_time = time.time()
 
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 if trajectory_start_time is not None:
                     t = env.data.time - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
 
                     if t >= trajectory_duration:
-                        current_target = trajectory_goal.copy()
+                        T_des = trajectory_goal.copy()
                         trajectory_start_time = None
                     else:
                         # current_target = interpolate_position(  # cubic time-scaling
@@ -133,17 +135,14 @@ def main():
                         #     trajectory_duration,
                         #     t,
                         # )
-                        current_target, _, _ = interpolate_position_quintic(
+                        T_des, _, _ = interpolate_pose(
                             trajectory_start,
                             trajectory_goal,
                             trajectory_duration,
                             t,
                         )
 
-                new_target = initial_pose.copy()
-                new_target[:3, 3] = current_target
-                if target_R is not None:
-                    new_target[:3, :3] = target_R
+                new_target = T_des.copy()
 
                 # left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
                 # left_target = get_body_T(env.data, left_hand_id)

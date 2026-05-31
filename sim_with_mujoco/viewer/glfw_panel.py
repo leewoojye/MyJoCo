@@ -10,7 +10,7 @@ class GlfwTargetPanel:
         self,
         initial_target,
         slider_range=(-0.2, 0.2),
-        rotation_slider_range=(-0.15, 0.15),
+        rotation_slider_range=(-0.25, 0.25),
         grasp_slider_range=(0.0, 1.0),
     ):
         self.base_target = np.r_[np.asarray(initial_target, dtype=float).reshape(3), np.zeros(len(self.AXES) - 3)]

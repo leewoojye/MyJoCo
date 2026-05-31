@@ -39,49 +39,57 @@ def quintic_time_scaling(T, t):
 def interpolate_position(p_start, p_end, T, t, return_acc=False):
     s_t, _, s_ddot_t = cubic_time_scaling(T, t)
     # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
-    p_current = p_start + s_t * (p_end - p_start)
+    p_t = p_start + s_t * (p_end - p_start)
     if return_acc:
-        return p_current, s_ddot_t
-    return p_current
+        return p_t, s_ddot_t
+    return p_t
 
 
 def interpolate_position_quintic(p_start, p_end, T, t):
     s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
-    p_current = p_start + s_t * (p_end - p_start)
-    p_dot_current = s_dot_t * (p_end - p_start)
-    p_dotdot_current = s_ddot_t * (p_end - p_start)
+    p_t = p_start + s_t * (p_end - p_start)
+    p_dot_t = s_dot_t * (p_end - p_start)
+    p_dotdot_t = s_ddot_t * (p_end - p_start)
 
-    return p_current, p_dot_current, p_dotdot_current
+    return p_t, p_dot_t, p_dotdot_t
 
 
 # 단순 선형 위치 보간
 def interpolate_position_simple(p_start, p_end, T, t):
     scaled_t = t / T
-    p_current = p_start + scaled_t * (p_end - p_start)
+    p_t = p_start + scaled_t * (p_end - p_start)
 
-    return p_current
+    return p_t
 
 
 # 회전 보간
 # R(t) = R0 @ exp( s(t) * log(R0.T @ R1) )
 def interpolate_rotation(R_start, R_end, T, t):
-    s_t, _, _ = cubic_time_scaling(T, t)
+    s_t, s_dot_t, s_dotdot_t = cubic_time_scaling(T, t)
     R_rel = R_start.T @ R_end
 
     rotvec_rel = Rotation.from_matrix(R_rel).as_rotvec()
     R_inc = Rotation.from_rotvec(s_t * rotvec_rel).as_matrix()
 
-    return R_start @ R_inc
+    w_t = R(t) @ (s_dot_t * rotvec_rel)
+    w_dot_t = R(t) @ (s_dotdot_t * rotvec_rel)
+
+    return R_start @ R_inc, w_t, w_dot_t
 
 
 def interpolate_rotation_slerp(R_start, R_end, T, t):
-    s_t, _, _ = cubic_time_scaling(T, t)
+    s_t, s_dot_t, s_dotdot_t = cubic_time_scaling(T, t)
     s_t = np.clip(s_t, 0.0, 1.0)
 
     key_rots = Rotation.from_matrix([R_start, R_end])
     slerp = Slerp([0.0, 1.0], key_rots)
+    R_t = slerp([s_t]).as_matrix()[0]
 
-    return slerp([s_t]).as_matrix()[0]
+    rotvec_rel = Rotation.from_matrix(R_start.T @ R_end).as_rotvec()
+    w_t = R_t @ (s_dot_t * rotvec_rel)
+    w_dot_t = R_t @ (s_dotdot_t * rotvec_rel)
+
+    return R_t, w_t, w_dot_t
 
 
 # 자세 보간
@@ -90,10 +98,14 @@ def interpolate_pose(T_start, T_end, T, t):
     p_end = T_end[:3, 3]
     R_start = T_start[:3, :3]
     R_end = T_end[:3, :3]
-    p_t = interpolate_position_quintic(p_start, p_end, T, t)
-    R_t = interpolate_rotation_slerp(R_start, R_end, T, t)
+    p_t, p_dot_t, p_dotdot_t = interpolate_position_quintic(p_start, p_end, T, t)
+    R_t, w_t, w_dot_t = interpolate_rotation_slerp(R_start, R_end, T, t)
     T_t = create_transform_matrix(R_t, p_t)
-    return T_t
+
+    twist_des = np.r_[w_t, p_dot_t]
+    twistdot_des = np.r_[w_dot_t, p_dotdot_t]
+
+    return T_t, twist_des, twistdot_des
 
 
 # def trajectory_generator(p_start, p_end, T, dt):
