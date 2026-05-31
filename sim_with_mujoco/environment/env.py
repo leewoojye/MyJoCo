@@ -32,6 +32,8 @@ class Environment:
             end_effector,
         )
         self.viewer = Viewer(self.model, self.data)
+        # self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
+        # self.left_initial_T = get_body_T(self.data, self.left_hand_id)
 
     def get_ctrl(self):
         return self.data.ctrl
@@ -57,6 +59,9 @@ class Environment:
         # 초기 목표 위치 및 자세 저장
         self.initial_target_pos = self.data.xpos[self.ee_body_id].copy()
         self.initial_pose = get_body_T(self.data, self.ee_body_id)
+
+        self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
+        self.left_initial_T = get_body_T(self.data, self.left_hand_id)
         return
 
     # step() wrapper

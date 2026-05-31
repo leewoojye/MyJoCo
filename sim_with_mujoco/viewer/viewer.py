@@ -85,9 +85,11 @@ class Viewer:
         self.hand_pose_panel.render(self.window, self.context)
         self.gui_panel.render(self.window, self.context)
 
-        # GLFW/OpenGL - double buffering
+        # glfw/opengl - double buffering
         # render()가 그린 화면을 비로소 창에 띄움
+        # step -> render -> swap -> poll
         glfw.swap_buffers(self.window)
+        glfw.poll_events()
 
     def terminate_viewer(self):
         glfw.terminate()

@@ -5,7 +5,7 @@ import mujoco
 import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import interpolate_position, interpolate_position_simple
+from sim.model.motion.trajectory import interpolate_position, interpolate_position_quintic, interpolate_position_simple
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
@@ -86,7 +86,7 @@ def main():
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
-            glfw.poll_events()
+            # glfw.poll_events()
 
             # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
             # 주기 관리: 반복문 / 조건문
@@ -121,30 +121,36 @@ def main():
                         current_target = trajectory_goal.copy()
                         trajectory_start_time = None
                     else:
-                        current_target = interpolate_position(  # cubic time-scaling
-                            trajectory_start,
-                            trajectory_goal,
-                            trajectory_duration,
-                            t,
-                        )
+                        # current_target = interpolate_position(  # cubic time-scaling
+                        #     trajectory_start,
+                        #     trajectory_goal,
+                        #     trajectory_duration,
+                        #     t,
+                        # )
                         # current_target = interpolate_position_simple(  # 선형 보간
                         #     trajectory_start,
                         #     trajectory_goal,
                         #     trajectory_duration,
                         #     t,
                         # )
+                        current_target, _, _ = interpolate_position_quintic(
+                            trajectory_start,
+                            trajectory_goal,
+                            trajectory_duration,
+                            t,
+                        )
 
                 new_target = initial_pose.copy()
                 new_target[:3, 3] = current_target
                 if target_R is not None:
                     new_target[:3, :3] = target_R
 
-                left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
-                left_target = get_body_T(env.data, left_hand_id)
+                # left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
+                # left_target = get_body_T(env.data, left_hand_id)
                 q_des, joint_ids = solve_ik(
                     env.model,
                     env.data,
-                    [(env.ee_body_id, new_target), (left_hand_id, left_target)],
+                    [(env.ee_body_id, new_target), (env.left_hand_id, env.left_initial_T)],
                     is_pose=[True, False],
                     joint_names=ik_joint_names,
                     check_collision=True,
@@ -158,22 +164,25 @@ def main():
                     #     jid = env.model.actuator_trnid[actuator_id, 0]
                     #     qadr = env.model.jnt_qposadr[jid]
                     #     env.data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
+
                     # 옵션 2: kinematic update (kinematic simulation)
                     for joint_id in joint_ids:
                         qadr = env.model.jnt_qposadr[joint_id]
                         env.data.qpos[qadr] = q_des[qadr]
-                    for actuator_id in actuator_ids:
+                    for actuator_id in actuator_ids:  # optional
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
                         env.data.ctrl[actuator_id] = q_des[qadr]
 
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
+                    # interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
                     # mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
                     # env.data.qfrc_applied[:] = 0.0
                     # env.data.qfrc_applied[:] = env.data.qfrc_bias
                     # env.step(steps_per_sim)
+
                     # 옵션 2
                     env.data.qvel[:] = 0.0
                     mujoco.mj_forward(env.model, env.data)

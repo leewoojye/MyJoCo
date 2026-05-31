@@ -97,7 +97,7 @@ def main():
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
-            glfw.poll_events()
+            # glfw.poll_events()
 
             # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
             # 주기 관리: 반복문 / 조건문
@@ -107,6 +107,7 @@ def main():
             last_poll_time = now
             polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
             # env.viewer.render()  # 패널 입력 실시간 반영을 위한 렌더링
+
             if polled_target is not None:
                 trajectory_start = current_target.copy()
                 trajectory_goal = polled_target[:3].copy()
@@ -158,20 +159,15 @@ def main():
                         # else:
                         #     trajectory_last_time = 0
 
-                # qdot_des = pinv(J) @ p_dot_des
-                # qddot_des = pinv(J) @ (p_ddot_des - Jdot_qdot)
-
                 new_target = initial_pose.copy()
                 new_target[:3, 3] = current_target
                 if target_R is not None:
                     new_target[:3, :3] = target_R
 
-                left_hand_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
-                left_target = get_body_T(env.data, left_hand_id)
                 q_des, joint_ids = solve_ik(
                     env.model,
                     env.data,
-                    [(env.ee_body_id, new_target), (left_hand_id, left_target)],
+                    [(env.ee_body_id, new_target), (env.left_hand_id, env.left_initial_T)],
                     is_pose=[True, False],
                     joint_names=ik_joint_names,
                     check_collision=False,
@@ -185,7 +181,8 @@ def main():
                     for actuator_id in actuator_ids:
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
-                        env.data.ctrl[actuator_id] = q_des[qadr]  # ctrl 유형은 관절 종류에 따라 다름(예. force/qpos 등)
+                        env.data.ctrl[actuator_id] = q_des[qadr]  # position actuator ctrl = qpos
+
                     # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:
                     #     qadr = env.model.jnt_qposadr[joint_id]
@@ -197,6 +194,7 @@ def main():
 
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
+                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
                     mujoco.mj_copyData(temp_data, env.model, env.data)
                     mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
@@ -204,11 +202,11 @@ def main():
                     # PD controller
                     q_dot_des, q_dotdot_des = env.task_to_joint_space(p_dot_des, p_dotdot_des, joint_ids)
                     tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
-                    env.data.qfrc_applied[:] = 0.0
-                    env.data.qfrc_applied[dof_ids] = tau_des
+                    # env.data.qfrc_applied[:] = 0.0
+                    # env.data.qfrc_applied[dof_ids] = tau_des
 
-                    # env.data.qfrc_applied[dof_ids] = 0.0
-                    # env.data.qfrc_applied[dof_ids] = temp_data.qfrc_bias[dof_ids]
+                    env.data.qfrc_applied[dof_ids] = 0.0
+                    env.data.qfrc_applied[dof_ids] = temp_data.qfrc_bias[dof_ids]
                     env.step(steps_per_sim)
 
                     # 옵션 2
@@ -217,6 +215,7 @@ def main():
                     # env.step(steps_per_sim)
 
             env.viewer.render()
+            # glfw.poll_events() # render wrapper에서 이벤트 폴링 및 callback 함수 실행하게 함
 
     finally:
         env.viewer.terminate_viewer()

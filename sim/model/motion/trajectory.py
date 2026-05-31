@@ -1,5 +1,8 @@
 import numpy as np
+from regex import R
 from scipy.spatial.transform import Rotation, Slerp
+
+from sim.model.math3d.transform import create_transform_matrix
 
 
 # time-scaling s(t): [0,T]->[0,1]
@@ -60,14 +63,37 @@ def interpolate_position_simple(p_start, p_end, T, t):
 
 
 # 회전 보간
-def interpolate_rotation(r_start, r_end, T, t):
+# R(t) = R0 @ exp( s(t) * log(R0.T @ R1) )
+def interpolate_rotation(R_start, R_end, T, t):
+    s_t, _, _ = cubic_time_scaling(T, t)
+    R_rel = R_start.T @ R_end
+
+    rotvec_rel = Rotation.from_matrix(R_rel).as_rotvec()
+    R_inc = Rotation.from_rotvec(s_t * rotvec_rel).as_matrix()
+
+    return R_start @ R_inc
+
+
+def interpolate_rotation_slerp(R_start, R_end, T, t):
     s_t, _, _ = cubic_time_scaling(T, t)
     s_t = np.clip(s_t, 0.0, 1.0)
 
-    key_rots = Rotation.from_matrix([r_start, r_end])
+    key_rots = Rotation.from_matrix([R_start, R_end])
     slerp = Slerp([0.0, 1.0], key_rots)
 
     return slerp([s_t]).as_matrix()[0]
+
+
+# 자세 보간
+def interpolate_pose(T_start, T_end, T, t):
+    p_start = T_start[:3, 3]
+    p_end = T_end[:3, 3]
+    R_start = T_start[:3, :3]
+    R_end = T_end[:3, :3]
+    p_t = interpolate_position_quintic(p_start, p_end, T, t)
+    R_t = interpolate_rotation_slerp(R_start, R_end, T, t)
+    T_t = create_transform_matrix(R_t, p_t)
+    return T_t
 
 
 # def trajectory_generator(p_start, p_end, T, dt):

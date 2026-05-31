@@ -3,7 +3,7 @@ import numpy as np
 
 
 # finger position interpolation: q = (1 - grasp) q_open + grasp q_closed
-def interpolate_finger(model, data, alpha):
+def interpolate_finger(model, data, alpha, is_left=False):
     # 네 손가락을 위한 초기 자세
     q_open = 0
 
@@ -14,7 +14,10 @@ def interpolate_finger(model, data, alpha):
 
     # 엄지 관절 보간
     for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
-        joint_name = f"finger_r_joint{i}"
+        if is_left:
+            joint_name = f"finger_l_joint{i}"
+        else:
+            joint_name = f"finger_r_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         qadr = model.jnt_qposadr[joint_id]
@@ -23,7 +26,10 @@ def interpolate_finger(model, data, alpha):
         data.ctrl[actuator_id] = value
     # 네 손가락 관절 보간
     for i in range(5, 21):
-        joint_name = f"finger_r_joint{i}"
+        if is_left:
+            joint_name = f"finger_l_joint{i}"
+        else:
+            joint_name = f"finger_r_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         q_closed = model.jnt_range[joint_id, 1]

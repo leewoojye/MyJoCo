@@ -1,3 +1,27 @@
 Wed May 27 21:00:15 2026
 ERROR: mjv_cameraFrustum: fixed camera id is outside valid range
 
+Sun May 31 02:51:35 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.1220.
+
+Sun May 31 02:53:52 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 47. The simulation is unstable. Time = 55.9100.
+
+Sun May 31 02:58:16 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 11. The simulation is unstable. Time = 16.4420.
+
+Sun May 31 03:00:43 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 63. The simulation is unstable. Time = 56.4100.
+
+Sun May 31 03:09:16 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.2940.
+
+Sun May 31 03:19:36 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 9.3900.
+
+Sun May 31 03:26:05 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 36. The simulation is unstable. Time = 9.3180.
+
+Sun May 31 03:35:10 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Time = 0.2940.
+
