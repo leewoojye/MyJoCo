@@ -80,7 +80,7 @@ def main():
     # 주기 상수
     sim_steps_per_frame = 8
     steps_per_sim = 8
-    poll_interval = 1.0 / 60.0
+    poll_interval = 1.0 / 30.0
     render_interval = 1.0 / 60.0
     last_poll_time = time.time()
     last_render_time = time.time()
@@ -94,8 +94,7 @@ def main():
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
-    trajectory_duration = 0.1
-    # trajectory_duration = poll_interval
+    trajectory_duration = 0.05
 
     # 입력 정보 관리
     polled_target = None
@@ -103,34 +102,36 @@ def main():
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
-            glfw.poll_events()
-
-            # 1. rendering 주기 / 2. poll 주기 / 3. 시뮬레이션 주기 / 4. step() 자체 주기(예. model.opt.timestep) 분리
-            # 주기 관리: 반복문 / 조건문
-            now = time.time()  # 절대 시간 (시뮬레이션 시간은 env.data.time)
-
-            # if now - last_poll_time >= poll_interval: # poll 주기 설정
-            last_poll_time = now
-            polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
-            # env.viewer.render()  # 패널 입력 실시간 반영을 위한 렌더링
-
-            if polled_target is not None:
-                trajectory_start = T_des.copy()
-                trajectory_goal = T_des.copy()
-                # xyz 입력 반영
-                trajectory_goal[:3, 3] = polled_target[:3].copy()
-
-                # rpy 입력 반영
-                target_rpy = polled_target[3:]
-                target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
-                trajectory_goal[:3, :3] = initial_pose[:3, :3] @ target_rot
-
-                # hand grasp 입력 반영
-                alpha[:] = [polled_target[6], polled_target[7]]
-
-                trajectory_start_time = env.data.time
-
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
+                glfw.poll_events()
+
+                now = time.time()
+
+                # polled_target = None
+                if now - last_poll_time >= poll_interval:  # poll 주기 설정
+                    last_poll_time = now
+                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+
+                if polled_target is not None:
+                    # trajectory_start = T_des.copy()
+                    trajectory_goal = T_des.copy()
+                    # xyz 입력 반영
+                    trajectory_goal[:3, 3] = polled_target[:3].copy()
+
+                    # rpy 입력 반영
+                    target_rpy = polled_target[3:]
+                    target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
+                    trajectory_goal[:3, :3] = initial_pose[:3, :3] @ target_rot
+
+                    # hand grasp 입력 반영
+                    alpha[:] = [polled_target[6], polled_target[7]]
+
+                    # 궤적이 없을 때만 궤적 시발점/출발점 설정, poll 주기마다 start time을 갱신하면 매번 새 궤적이 궤적이 생성되며 t에 변화가 없어짐
+                    if trajectory_start_time is None:
+                        trajectory_start = T_des.copy()
+                        trajectory_start_time = env.data.time
+
+                # for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 twist_des = np.zeros(6)
                 twistdot_des = np.zeros(6)
 
