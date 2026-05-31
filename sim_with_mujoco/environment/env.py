@@ -52,7 +52,7 @@ class Environment:
             actuator_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
             qadr = self.model.jnt_qposadr[joint_id]
             self.data.qpos[qadr] = value
-            self.data.ctrl[actuator_id] = self.data.qpos[qadr]
+            # self.data.ctrl[actuator_id] = self.data.qpos[qadr]
 
         # qpos/qvel/ctrl 기준으로 kinematics + velocity, force, qacc 등등 계산
         mujoco.mj_forward(self.model, self.data)
@@ -126,6 +126,7 @@ class Environment:
         return
 
     # pose(6D) 기준 task-space x를 joint space q로 변환
+    # 함수명 수정 예정
     def task_to_joint_space(self, twist_des, twistdot_des, joint_ids):
         dof_ids = dof_ids_from_joints(self.model, joint_ids)
 

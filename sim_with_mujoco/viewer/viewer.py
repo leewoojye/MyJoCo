@@ -12,7 +12,7 @@ class Viewer:
         self.model = model
         self.data = data
 
-    def init_viewer(self, initial_target_pos, slider_range=(-0.2, 0.2), rotation_slider_range=(-0.15, 0.15)):
+    def init_viewer(self, initial_target_pos, slider_range=(-0.2, 0.2), rotation_slider_range=(-0.25, 0.25)):
         self.hand_pose_panel = GlfwTargetPanel(
             initial_target_pos,
             slider_range=slider_range,
@@ -36,15 +36,23 @@ class Viewer:
 
         self.cam = mujoco.MjvCamera()
         self.opt = mujoco.MjvOption()  # 시각화 대상 설정 옵션
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
+        mujoco.mjv_defaultOption(self.opt)
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTSPLIT] = True
+        self.opt.flags[mujoco.mjtVisFlag.mjVIS_ACTUATOR] = True
+        self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
+        # self.model.vis.map.force = 0.02
+        # self.model.vis.scale.forcewidth = 0.01
+        self.model.vis.scale.actuatorlength = 1.0
+        self.model.vis.scale.actuatorwidth = 0.1
+
         self.scene = mujoco.MjvScene(self.model, maxgeom=10000)
         self.context = mujoco.MjrContext(
             self.model,
             mujoco.mjtFontScale.mjFONTSCALE_150,
         )
 
-        mujoco.mjv_defaultOption(self.opt)
         mujoco.mjv_defaultCamera(self.cam)
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         self.cam.lookat[:] = [0, 0, 1.0]

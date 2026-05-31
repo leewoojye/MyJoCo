@@ -17,7 +17,7 @@ from sim_with_mujoco.utils.dynamics import pd_controller
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
-from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints
+from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
 
@@ -55,6 +55,8 @@ def main():
 
     # 임시 MjData (forward, step 중복 계산 방지용)
     temp_data = mujoco.MjData(env.model)
+    mujoco.mj_copyData(temp_data, env.model, env.data)
+    mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
     ik_joint_names = [
         "lift_joint",
@@ -206,19 +208,21 @@ def main():
 
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
-                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
+                    # interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
-                    mujoco.mj_copyData(temp_data, env.model, env.data)
-                    mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
+                    # mujoco.mj_copyData(temp_data, env.model, env.data)
+                    # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
                     # PD controller
                     q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
-                    tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
+                    # tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
                     # env.data.qfrc_applied[:] = 0.0
                     # env.data.qfrc_applied[dof_ids] = tau_des
 
-                    env.data.qfrc_applied[dof_ids] = 0.0
-                    env.data.qfrc_applied[dof_ids] = temp_data.qfrc_bias[dof_ids]
+                    all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
+                    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
+                    env.data.qfrc_applied[all_dof_ids] = 0.0
+                    env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
                     env.step(steps_per_sim)
 
                     # 옵션 2

@@ -31,8 +31,9 @@ def pd_controller(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):  # qp
 
     dof_ids = dof_ids_from_joints(model, joint_ids)
     qpos_ids = model.jnt_qposadr[joint_ids]
-    kp = model.actuator_gainprm[dof_ids, 0]
-    kd = 60
+    # kp = model.actuator_gainprm[dof_ids, 0]
+    kp = 25
+    kd = 10
 
     qacc_des = (
         q_dotdot_des  # task_to_joint_space()로 인해 active actuator에 대한 원소로만 구성
@@ -49,7 +50,7 @@ def pd_controller(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):  # qp
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
 
         if actuator_id >= 0 and model.actuator_forcelimited[actuator_id]:
-            lo, hi = model.actuator_forcerange[actuator_id]
+            lo, hi = model.actuator_ctrlrange[actuator_id]  # 모델마다 range명 상이
             tau[i] = np.clip(tau[i], lo, hi)
     return tau
 

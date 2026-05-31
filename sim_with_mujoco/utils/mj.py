@@ -1,4 +1,5 @@
 import mujoco
+import numpy as np
 
 
 # joint id: 관절 정보 인덱스 (model.jnt_*)
@@ -42,3 +43,8 @@ def dof_ids_from_joints(model, joint_ids):
         dof_ids.append(model.jnt_dofadr[joint_id])
 
     return dof_ids
+
+
+def joint_ids_from_names(model, joint_names):
+    joint_ids = np.array([mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in joint_names], dtype=int) # 인덱스 자료형 명시
+    return joint_ids
