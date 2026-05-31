@@ -13,13 +13,13 @@ from sim.model.motion.trajectory import (
     interpolate_position_simple,
 )
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import ct_joint_space
+from sim_with_mujoco.utils.dynamics import ct_joint_space, pd_task_space
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
-XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
+XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
 
 
 def main():
@@ -93,9 +93,6 @@ def main():
     T_des = initial_pose.copy()
     trajectory_start_time = None
     trajectory_last_time = 0
-    # trajectory_duration = (
-    #     env.model.opt.timestep * sim_steps_per_frame
-    # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
     trajectory_duration = 0.05
 
     # 입력 정보 관리
@@ -128,74 +125,66 @@ def main():
                     # hand grasp 입력 반영
                     alpha[:] = [polled_target[6], polled_target[7]]
 
-                    # 궤적이 없을 때만 궤적 시발점/출발점 설정, poll 주기마다 start time을 갱신하면 매번 새 궤적이 궤적이 생성되며 t에 변화가 없어짐
                     if trajectory_start_time is None:
                         trajectory_start = T_des.copy()
                         trajectory_start_time = env.data.time
 
-                # for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 twist_des = np.zeros(6)
                 twistdot_des = np.zeros(6)
 
                 if trajectory_start_time is not None:
-                    t = env.data.time - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
+                    t = env.data.time - trajectory_start_time
 
                     if t >= trajectory_duration:  # 궤적 주기가 끝난 후에는 목표 pose를 고정
                         T_des = trajectory_goal.copy()
                         trajectory_start_time = None
                     else:
-                        # current_target, qacc_des = interpolate_position(  # cubic time-scaling
-                        #     trajectory_start, trajectory_goal, trajectory_duration, t, True
-                        # )
-                        # current_target = interpolate_position_simple(  # 선형 보간
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
-                        # current_target, p_dot_des, p_dotdot_des = interpolate_position_quintic(
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
                         T_des, twist_des, twistdot_des = interpolate_pose(
                             trajectory_start,
                             trajectory_goal,
                             trajectory_duration,
                             t,
                         )
-                        # if trajectory_last_time is not None:
-                        #     prev_p, prev_p_dot, prev_p_dotdot = interpolate_position_quintic(
-                        #         trajectory_start,
-                        #         trajectory_goal,
-                        #         trajectory_duration,
-                        #         trajectory_last_time,
-                        #     )
-                        #     trajectory_last_time = t
-                        # else:
-                        #     trajectory_last_time = 0
 
                 new_target = T_des.copy()
 
-                q_des, joint_ids = solve_ik(
-                    env.model,
-                    env.data,
-                    [(env.ee_body_id, new_target), (env.left_hand_id, env.left_initial_T)],
-                    is_pose=[True, False],
-                    joint_names=ik_joint_names,
-                    check_collision=False,
-                )
-                actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
+                # q_des, joint_ids = solve_ik(
+                #     env.model,
+                #     env.data,
+                #     [(env.ee_body_id, new_target)],
+                #     is_pose=[True],
+                #     joint_names=ik_joint_names,
+                #     check_collision=False,
+                # )
 
                 for i in range(1):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
                     # 옵션 1: dynamic update (dynamic simulation)
-                    dof_ids = dof_ids_from_joints(env.model, joint_ids)
-                    for actuator_id in actuator_ids:
-                        jid = env.model.actuator_trnid[actuator_id, 0]
-                        qadr = env.model.jnt_qposadr[jid]
-                        env.data.ctrl[actuator_id] = q_des[qadr]  # position actuator ctrl = qpos
+                    # dof_ids = dof_ids_from_joints(env.model, joint_ids)
+                    # for actuator_id in actuator_ids:
+                    #     jid = env.model.actuator_trnid[actuator_id, 0]
+                    #     qadr = env.model.jnt_qposadr[jid]
+                    #     env.data.ctrl[actuator_id] = q_des[qadr]  # position actuator ctrl = qpos
+
+                    # PD controller
+                    joint_ids = joint_ids_from_names(env.model, ik_joint_names)
+                    tau_des = pd_task_space(env, T_des, twist_des, twistdot_des, joint_ids)
+
+                    for i, joint_id in enumerate(joint_ids):
+                        actuator_id = None
+
+                        for a in range(env.model.nu):
+                            if env.model.actuator_trntype[a] != mujoco.mjtTrn.mjTRN_JOINT:
+                                continue
+                            if env.model.actuator_trnid[a, 0] == joint_id:
+                                actuator_id = a
+                                break
+
+                        if actuator_id is None:
+                            continue
+
+                        gear = env.model.actuator_gear[actuator_id, 0]
+                        env.data.ctrl[actuator_id] = tau_des[i] / gear
 
                     # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:
@@ -206,23 +195,14 @@ def main():
                     #     qadr = env.model.jnt_qposadr[jid]
                     #     env.data.ctrl[actuator_id] = q_des[qadr]
 
-                    # 손가락 위치 보간
-                    interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
-                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
                     # mujoco.mj_copyData(temp_data, env.model, env.data)
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
-                    # PD controller
-                    q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
-                    # tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
-                    # env.data.qfrc_applied[:] = 0.0
-                    # env.data.qfrc_applied[dof_ids] = tau_des
-
-                    all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
-                    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
-                    env.data.qfrc_applied[all_dof_ids] = 0.0
-                    env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
+                    # all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
+                    # all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
+                    # env.data.qfrc_applied[all_dof_ids] = 0.0
+                    # env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
                     env.step(steps_per_sim)
 
                     # 옵션 2
@@ -233,7 +213,6 @@ def main():
                     if now - last_render_time >= render_interval:
                         env.viewer.render()
                         last_render_time = now
-                        # glfw.poll_events() # render wrapper에서 이벤트 폴링 및 callback 함수 실행하게 함
 
     finally:
         env.viewer.terminate_viewer()

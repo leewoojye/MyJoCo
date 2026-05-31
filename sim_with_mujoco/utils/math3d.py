@@ -17,7 +17,7 @@ def get_body_T(data, body_id):
     return T
 
 
-def get_body_twsit(model, data, ee_id, joint_ids):
+def get_body_twist(model, data, ee_id, joint_ids):
     dof_ids = np.array([model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
 
     # body jacobian

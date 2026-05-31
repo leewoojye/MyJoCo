@@ -17,7 +17,7 @@ from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
-XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
+XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
 
 
 def main():
@@ -153,37 +153,44 @@ def main():
                         q_dotdot_des = np.zeros(len(joint_ids))
                         trajectory_start_time = None
                     else:
-                        q_des, q_dot_des, q_dotdot_des = interpolate_joint(
+                        q_des, q_dot_des_full, q_dotdot_des_full = interpolate_joint(
                             q_traj_start,
                             q_traj_goal,
                             trajectory_duration,
                             t,
                         )
+                        qpos_ids = env.model.jnt_qposadr[joint_ids]
+                        q_dot_des = q_dot_des_full[qpos_ids]
+                        q_dotdot_des = q_dotdot_des_full[qpos_ids]
 
                 new_target = T_des.copy()
 
-                actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
-
                 for _ in range(1):  # 수정 예정
                     # 옵션 1: dynamic update (dynamic simulation)
-                    dof_ids = dof_ids_from_joints(env.model, joint_ids)
-
-                    for actuator_id in actuator_ids:
-                        jid = env.model.actuator_trnid[actuator_id, 0]
-                        qadr = env.model.jnt_qposadr[jid]
-                        env.data.ctrl[actuator_id] = q_des[qadr]
+                    qpos_ids = env.model.jnt_qposadr[joint_ids]
 
                     interpolate_finger(env.model, env.data, alpha)
                     interpolate_finger(env.model, env.data, [0, 0], True)
 
                     # PD controller
-                    # q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
-                    # tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
+                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
 
-                    all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
-                    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
-                    env.data.qfrc_applied[all_dof_ids] = 0.0
-                    env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
+                    for i, joint_id in enumerate(joint_ids):
+                        actuator_id = None
+
+                        for a in range(env.model.nu):
+                            if env.model.actuator_trntype[a] != mujoco.mjtTrn.mjTRN_JOINT:
+                                continue
+                            if env.model.actuator_trnid[a, 0] == joint_id:
+                                actuator_id = a
+                                break
+
+                        if actuator_id is None:
+                            continue
+
+                        gear = env.model.actuator_gear[actuator_id, 0]
+                        env.data.ctrl[actuator_id] = tau_des[i] / gear
+
                     env.step(steps_per_sim)
 
                     if now - last_render_time >= render_interval:

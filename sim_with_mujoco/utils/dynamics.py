@@ -4,7 +4,7 @@ import numpy as np
 from sim.model.kinematics.ik import calculate_twist_error
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.kinematics import get_body_jacobian
-from sim_with_mujoco.utils.math3d import get_body_twsit
+from sim_with_mujoco.utils.math3d import get_body_twist
 from sim_with_mujoco.utils.mj import dof_ids_from_joints, joint_ids_from_actuators
 
 
@@ -27,8 +27,12 @@ def taskacc_to_jointacc():
     return
 
 
+def pd_joint_space():
+    return
+
+
 # position actuator를 위한 임시 PD controller
-def pd_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):  # qpos_ids, joints_id
+def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     # inverse dynamic 계산용
     inv_data = mujoco.MjData(model)
     mujoco.mj_copyData(inv_data, model, data)
@@ -39,17 +43,17 @@ def pd_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):  # q
     kp = 16
     kd = 4
 
-    q_dotdot_des = np.zeros(
-        len(joint_ids)
-    )  # cmd = kp * (q_des - q) - kd * qdot, 컨트롤러가 목표 궤적이 정지해있다고 인식하며 0이 아닐 경우 움직이는 목표를 고려해 힘을 가중함
+    # cmd = kp * (q_des - q) - kd * qdot, 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
+    q_dotdot_des = np.zeros(len(joint_ids))
     q_dot_des = np.zeros(len(joint_ids))
+
     qacc_des = (
         q_dotdot_des  # task_to_joint_space()로 인해 active actuator에 대한 원소로만 구성
         + kp * (q_des[qpos_ids] - inv_data.qpos[qpos_ids])
         + kd * (q_dot_des - inv_data.qvel[dof_ids])
     )
     inv_data.qacc[dof_ids] = qacc_des
-    mujoco.mj_inverse(model, inv_data)
+    mujoco.mj_inverse(model, inv_data) # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
     tau = inv_data.qfrc_inverse[dof_ids]  # qfrc_inverse(inverse 결과 저장용), qfrc_applied(forward, step 입력용)
 
     # forcerange 기반 클리핑
@@ -69,23 +73,19 @@ def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids):
     kp = 16
     kd = 4
 
-    twist_current = get_body_twsit(
-        env.model,
-        env.data,
-        env.ee_body_id,
-    )
+    twist_current = get_body_twist(env.model, env.data, env.ee_body_id, joint_ids)
     twist_error = env.get_twist_error(x_des)
     cmd = twist_dot_des + kd * (twist_des - twist_current) + kp * twist_error
 
-    J = get_body_jacobian(env.model, env.data, env.ee_body_id)
+    J = get_body_jacobian(env.model, env.data, env.ee_body_id)[:, dof_ids]
     tau = J.T @ cmd
 
     return tau
 
 
-def pid_controller():
+def ct_task_space():
     return
 
 
-def computed_torque():
+def pid_controller():
     return
