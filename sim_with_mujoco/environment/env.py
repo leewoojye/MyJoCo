@@ -3,6 +3,7 @@
 from typing import Callable, NamedTuple, Optional, Union
 import mujoco
 import numpy as np
+from sim.model.kinematics.ik import calculate_twist_error
 from sim_with_mujoco.mjcf.parser import parser
 from sim_with_mujoco.utils.ik import damped_pseudoinverse
 from sim_with_mujoco.utils.math3d import get_body_T
@@ -59,6 +60,7 @@ class Environment:
         # 초기 목표 위치 및 자세 저장
         self.initial_target_pos = self.data.xpos[self.ee_body_id].copy()
         self.initial_pose = get_body_T(self.data, self.ee_body_id)
+        self.initial_q = self.data.qpos.copy()
 
         self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
         self.left_initial_T = get_body_T(self.data, self.left_hand_id)
@@ -148,5 +150,12 @@ class Environment:
         J_inv = damped_pseudoinverse(J, 1e-3)
 
         qdot_des = J_inv @ twist_des
-        qddot_des = J_inv @ (twistdot_des - J_dot @ qvel) # qdot_des를 미분해서 전개한 식
+        qddot_des = J_inv @ (twistdot_des - J_dot @ qvel)  # qdot_des를 미분해서 전개한 식
         return qdot_des, qddot_des
+
+    def get_twist_error(self, target_T):
+        T = np.eye(4)
+        T[:3, 3] = self.data.xpos[self.ee_body_id]
+        T[:3, :3] = self.data.xmat[self.ee_body_id].reshape(3, 3)
+        _, twist_error = calculate_twist_error(T, target_T)
+        return twist_error

@@ -40,8 +40,8 @@ class Viewer:
         # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
         # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
         # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTSPLIT] = True
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_ACTUATOR] = True
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_ACTUATOR] = True
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
         # self.model.vis.map.force = 0.02
         # self.model.vis.scale.forcewidth = 0.01
         self.model.vis.scale.actuatorlength = 1.0

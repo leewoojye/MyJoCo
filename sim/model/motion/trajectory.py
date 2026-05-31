@@ -108,6 +108,17 @@ def interpolate_pose(T_start, T_end, T, t):
     return T_t, twist_des, twistdot_des
 
 
+# joint space에서 qpos 보간
+def interpolate_joint(q_start, q_end, T, t):
+    # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
+    s_t, s_dot_t, s_ddot_t = cubic_time_scaling(T, t)
+    q_des = q_start + s_t * (q_end - q_start)
+    q_dot_des = s_dot_t * (q_end - q_start)
+    q_dotdot_des = s_ddot_t * (q_end - q_start)
+
+    return q_des, q_dot_des, q_dotdot_des
+
+
 # def trajectory_generator(p_start, p_end, T, dt):
 #     num_point = np.floor(T / dt) + 1
 #     for i in range(num_point):

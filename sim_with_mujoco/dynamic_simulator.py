@@ -13,7 +13,7 @@ from sim.model.motion.trajectory import (
     interpolate_position_simple,
 )
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import pd_controller
+from sim_with_mujoco.utils.dynamics import pd_joint_space
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
@@ -208,7 +208,7 @@ def main():
 
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
-                    # interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
+                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
                     # 옵션 1
                     # mujoco.mj_copyData(temp_data, env.model, env.data)
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward

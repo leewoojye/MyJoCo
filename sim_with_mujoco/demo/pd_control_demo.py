@@ -13,7 +13,7 @@ from sim.model.motion.trajectory import (
     interpolate_position_simple,
 )
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import pd_controller
+from sim_with_mujoco.utils.dynamics import pd_joint_space
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
@@ -152,7 +152,7 @@ def main():
                     env.model,
                     env.data,
                     [(env.ee_body_id, new_target)],
-                    is_pose=[True], 
+                    is_pose=[True],
                     joint_names=ik_joint_names,
                     check_collision=False,
                 )
@@ -169,7 +169,7 @@ def main():
 
                     # PD controller
                     q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
-                    tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
+                    tau_des = pd_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
                     # env.data.qfrc_applied[:] = 0.0
                     # env.data.qfrc_applied[dof_ids] = tau_des
 
