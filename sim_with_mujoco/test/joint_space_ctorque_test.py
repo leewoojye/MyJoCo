@@ -112,6 +112,7 @@ def main():
 
                 now = time.time()
 
+                polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
@@ -139,7 +140,8 @@ def main():
                     )
 
                     if trajectory_start_time is None:
-                        q_traj_start = q_des.copy()
+                        # q_traj_start = q_des.copy()
+                        q_traj_start = env.data.qpos.cpoy()
                         q_traj_goal = trajectory_goal_q.copy()
                         trajectory_start_time = env.data.time
 

@@ -5,7 +5,7 @@ import mujoco
 import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import interpolate_position, interpolate_position_simple
+from sim.model.motion.trajectory import interpolate_position_cubic, interpolate_position_simple
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
@@ -118,7 +118,7 @@ def main():
                     current_target = trajectory_goal.copy()
                     trajectory_start_time = None
                 else:
-                    current_target = interpolate_position(  # cubic time-scaling
+                    current_target = interpolate_position_cubic(  # cubic time-scaling
                         trajectory_start,
                         trajectory_goal,
                         trajectory_duration,

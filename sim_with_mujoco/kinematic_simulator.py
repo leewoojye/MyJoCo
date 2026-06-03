@@ -7,7 +7,7 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import (
     interpolate_pose,
-    interpolate_position,
+    interpolate_position_cubic,
     interpolate_position_quintic,
     interpolate_position_simple,
 )
@@ -103,6 +103,7 @@ def main():
                 # alpha = np.zeros(2)
                 now = time.time()
 
+                polled_target = None
                 if now - last_poll_time >= poll_interval:  # poll 주기 설정
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
@@ -121,10 +122,10 @@ def main():
                     alpha[:] = [polled_target[6], polled_target[7]]
 
                     if trajectory_start_time is None:
-                        trajectory_start = T_des.copy()
+                        # trajectory_start = T_des.copy()
+                        trajectory_start = get_body_T(env.data, env.ee_body_id)
                         trajectory_start_time = env.data.time
 
-                # for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 if trajectory_start_time is not None:
                     t = env.data.time - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
 

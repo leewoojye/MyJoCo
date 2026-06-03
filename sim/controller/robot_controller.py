@@ -17,7 +17,7 @@ from sim.model.solver.form_closure import compute_grasp
 from sim.model.solver.grasp_solver import object_body_contacts, update_grasp_state
 from sim.model.kinematics.jacobian import update_body_twists
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import interpolate_position
+from sim.model.motion.trajectory import interpolate_position_cubic
 from sim.model.robot.loader_with_mujoco import build_robot_geometries
 from sim.model.robot.robot_state import RobotState
 from sim.view.renderer import run_target_window
@@ -235,7 +235,7 @@ def main():
             trajectory_elapsed += raw_dt
 
             t = min(trajectory_elapsed, trajectory_duration)  # 궤적 범위를 넘지 않도록 클리핑
-            target_pos = interpolate_position(trajectory_start, trajectory_goal, trajectory_duration, t)
+            target_pos = interpolate_position_cubic(trajectory_start, trajectory_goal, trajectory_duration, t)
 
         candidate_state = RobotState(
             robot.state.joint_names,
@@ -275,7 +275,9 @@ def main():
         # 추후 수정
         if grasp_goal is not None and not is_grasped:
             next_alpha = float(grasp_goal[0] if grasp_goal_is_thumb else grasp_goal[1])  # thumb 여부를 고려해 goal 설정
-            compute_grasp(robot, candidate_state, next_alpha, grasp_goal_is_thumb)  # 목표 alpha를 candidate_state에 반영
+            compute_grasp(
+                robot, candidate_state, next_alpha, grasp_goal_is_thumb
+            )  # 목표 alpha를 candidate_state에 반영
 
         # 접촉점 상대속도 기반 (강체 자체 상대속도 아님)
         # 흐름도: 상대속도로 각 접촉점에 가해지는 힘 계산(힘 크기는 고정시킨 상태)->계산된 힘 벡터 합산->물체의 질량으로 가속도 및 속도와 변위까지 계산
@@ -387,7 +389,9 @@ def main():
                 physics_dt,
             )
 
-        if trajectory_elapsed >= trajectory_duration: # 초반에 elapsed가 초과되어도 조금이라도 움직이게 하기 위해(?) handle_tick() 후반부에서 검사
+        if (
+            trajectory_elapsed >= trajectory_duration
+        ):  # 초반에 elapsed가 초과되어도 조금이라도 움직이게 하기 위해(?) handle_tick() 후반부에서 검사
             # trajectory_start_time = None
             trajectory_start = None
             trajectory_goal = None

@@ -101,6 +101,7 @@ def solve_ik(
         for joint_id, dq_i in zip(joint_ids, dq):
             qadr = model.jnt_qposadr[joint_id]
 
+            dq = np.clip(dq, -0.05, 0.05)
             ik_data.qpos[qadr] += dq_i
 
             # 관절각 제약 기반 클리핑

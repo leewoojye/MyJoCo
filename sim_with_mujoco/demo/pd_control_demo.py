@@ -8,7 +8,7 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import (
     interpolate_pose,
-    interpolate_position,
+    interpolate_position_cubic,
     interpolate_position_quintic,
     interpolate_position_simple,
 )

@@ -82,7 +82,7 @@ def main():
     # 주기 상수
     sim_steps_per_frame = 8
     steps_per_sim = 8
-    poll_interval = 1.0 / 30.0
+    poll_interval = 1.0 / 20.0
     render_interval = 1.0 / 60.0
     last_poll_time = time.time()
     last_render_time = time.time()
@@ -99,7 +99,8 @@ def main():
     q_traj_start = q_des.copy()
     q_traj_goal = q_des.copy()
     trajectory_start_time = None
-    trajectory_duration = 0.05
+    trajectory_duration = 0.08
+    # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
     polled_target = None
@@ -112,6 +113,7 @@ def main():
 
                 now = time.time()
 
+                polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
@@ -139,7 +141,8 @@ def main():
                     )
 
                     if trajectory_start_time is None:
-                        q_traj_start = q_des.copy()
+                        # q_traj_start = q_des.copy()
+                        q_traj_start = env.data.qpos.copy()
                         q_traj_goal = trajectory_goal_q.copy()
                         trajectory_start_time = env.data.time
 
@@ -160,7 +163,7 @@ def main():
                             t,
                         )
 
-                new_target = T_des.copy()
+                # new_target = T_des.copy()
 
                 actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 

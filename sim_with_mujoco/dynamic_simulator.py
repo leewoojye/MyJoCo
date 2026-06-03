@@ -8,7 +8,7 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import (
     interpolate_pose,
-    interpolate_position,
+    interpolate_position_cubic,
     interpolate_position_quintic,
     interpolate_position_simple,
 )
@@ -80,23 +80,23 @@ def main():
     initial_pose = env.initial_pose
 
     # 주기 상수
-    sim_steps_per_frame = 8
+    sim_steps_per_frame = 1
     steps_per_sim = 8
-    poll_interval = 1.0 / 30.0
+    poll_interval = 1.0 / 20.0
     render_interval = 1.0 / 60.0
-    last_poll_time = time.time()
-    last_render_time = time.time()
+    last_poll_time = 0
+    last_render_time = 0
 
     # 궤적 형성 관련 변수
     trajectory_start = initial_pose.copy()
     trajectory_goal = initial_pose.copy()
     T_des = initial_pose.copy()
     trajectory_start_time = None
-    trajectory_last_time = 0
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
-    trajectory_duration = 0.05
+    trajectory_duration = 0.4
+    # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
     polled_target = None
@@ -104,7 +104,7 @@ def main():
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
-            for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
+            for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프, 추후 수정
                 glfw.poll_events()
 
                 now = time.time()
@@ -112,10 +112,13 @@ def main():
                 # polled_target = None
                 if now - last_poll_time >= poll_interval:  # poll 주기 설정
                     last_poll_time = now
-                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+                    polled_target_tmp, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+                    if polled_target_tmp is not polled_target:
+                        polled_target = polled_target_tmp
+                    else:
+                        polled_target = None
 
                 if polled_target is not None:
-                    # trajectory_start = T_des.copy()
                     trajectory_goal = T_des.copy()
                     # xyz 입력 반영
                     trajectory_goal[:3, 3] = polled_target[:3].copy()
@@ -130,10 +133,10 @@ def main():
 
                     # 궤적이 없을 때만 궤적 시발점/출발점 설정, poll 주기마다 start time을 갱신하면 매번 새 궤적이 궤적이 생성되며 t에 변화가 없어짐
                     if trajectory_start_time is None:
-                        trajectory_start = T_des.copy()
+                        # trajectory_start = T_des.copy()
+                        trajectory_start = get_body_T(env.data, env.ee_body_id)
                         trajectory_start_time = env.data.time
 
-                # for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 twist_des = np.zeros(6)
                 twistdot_des = np.zeros(6)
 
@@ -165,16 +168,6 @@ def main():
                             trajectory_duration,
                             t,
                         )
-                        # if trajectory_last_time is not None:
-                        #     prev_p, prev_p_dot, prev_p_dotdot = interpolate_position_quintic(
-                        #         trajectory_start,
-                        #         trajectory_goal,
-                        #         trajectory_duration,
-                        #         trajectory_last_time,
-                        #     )
-                        #     trajectory_last_time = t
-                        # else:
-                        #     trajectory_last_time = 0
 
                 new_target = T_des.copy()
 
@@ -188,7 +181,7 @@ def main():
                 )
                 actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 
-                for i in range(1):  # 수정 예정
+                for _ in range(1):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
                     # 옵션 1: dynamic update (dynamic simulation)
                     dof_ids = dof_ids_from_joints(env.model, joint_ids)
@@ -221,8 +214,11 @@ def main():
 
                     all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
                     all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
+
+                    mujoco.mj_forward(env.model, env.data)
                     env.data.qfrc_applied[all_dof_ids] = 0.0
-                    env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
+                    env.data.qfrc_applied[all_dof_ids] = env.data.qfrc_bias[all_dof_ids]
+                    # env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
                     env.step(steps_per_sim)
 
                     # 옵션 2
@@ -230,10 +226,11 @@ def main():
                     # # mujoco.mj_forward(env.model, env.data)
                     # env.step(steps_per_sim)
 
-                    if now - last_render_time >= render_interval:
-                        env.viewer.render()
-                        last_render_time = now
-                        # glfw.poll_events() # render wrapper에서 이벤트 폴링 및 callback 함수 실행하게 함
+            now_ren = time.time()
+
+            if now_ren - last_render_time >= render_interval:
+                env.viewer.render()
+                last_render_time = now_ren
 
     finally:
         env.viewer.terminate_viewer()

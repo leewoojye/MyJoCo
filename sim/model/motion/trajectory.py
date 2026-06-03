@@ -36,7 +36,7 @@ def quintic_time_scaling(T, t):
     return s_t, s_dot_t, s_ddot_t
 
 
-def interpolate_position(p_start, p_end, T, t, return_acc=False):
+def interpolate_position_cubic(p_start, p_end, T, t, return_acc=False):
     s_t, _, s_ddot_t = cubic_time_scaling(T, t)
     # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
     p_t = p_start + s_t * (p_end - p_start)
@@ -78,7 +78,8 @@ def interpolate_rotation(R_start, R_end, T, t):
 
 
 def interpolate_rotation_slerp(R_start, R_end, T, t):
-    s_t, s_dot_t, s_dotdot_t = cubic_time_scaling(T, t)
+    # s_t, s_dot_t, s_dotdot_t = cubic_time_scaling(T, t)
+    s_t, s_dot_t, s_dotdot_t = quintic_time_scaling(T, t)
     s_t = np.clip(s_t, 0.0, 1.0)
 
     key_rots = Rotation.from_matrix([R_start, R_end])
@@ -98,6 +99,7 @@ def interpolate_pose(T_start, T_end, T, t):
     p_end = T_end[:3, 3]
     R_start = T_start[:3, :3]
     R_end = T_end[:3, :3]
+    # p_t, p_dot_t, p_dotdot_t = interpolate_position_cubic(p_start, p_end, T, t)
     p_t, p_dot_t, p_dotdot_t = interpolate_position_quintic(p_start, p_end, T, t)
     R_t, w_t, w_dot_t = interpolate_rotation_slerp(R_start, R_end, T, t)
     T_t = create_transform_matrix(R_t, p_t)

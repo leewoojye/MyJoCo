@@ -35,6 +35,7 @@ class Environment:
         self.viewer = Viewer(self.model, self.data)
         # self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
         # self.left_initial_T = get_body_T(self.data, self.left_hand_id)
+        self.tick = 0
 
     def get_ctrl(self):
         return self.data.ctrl
@@ -91,11 +92,15 @@ class Environment:
     # def set_time(): # mj_step()에서 관리
     #     return
 
-    def get_tick():
-        return
+    def get_tick(self):
+        return self.tick
 
     def set_tick():
         return
+
+    def inc_tick(self):
+        self.tick = self.tick + 1
+        return self.tick
 
     # transformation matrix getter: data.xpos + data.xmat
     # def get_space_T(self, site_id):
