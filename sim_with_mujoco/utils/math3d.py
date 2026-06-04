@@ -25,8 +25,29 @@ def get_body_twist(model, data, ee_id, joint_ids):
     jacr = np.zeros((3, model.nv))
     mujoco.mj_jacBody(model, data, jacp, jacr, ee_id)
 
-    J = np.vstack([jacr, jacp])[:, dof_ids]
+    J = np.vstack([jacr, jacp])[:, dof_ids]  # active joints에 대해서만 트위스트 계산
 
     qvel = data.qvel[dof_ids]
     twist_current = J @ qvel
     return twist_current
+
+# mj_objectVelocity()을 이용한 현재 바디 트위스트 계산
+def get_body_twist_general(model, data, ee_body_name):
+    twist = np.zeros(6)
+
+    ee_id = mujoco.mj_name2id(
+        model,
+        mujoco.mjtObj.mjOBJ_BODY,
+        ee_body_name,
+    )
+
+    mujoco.mj_objectVelocity(
+        model,
+        data,
+        mujoco.mjtObj.mjOBJ_BODY,
+        ee_id,
+        twist,
+        0,  # 0 or 1: world/body frame orientation
+    )
+
+    return twist

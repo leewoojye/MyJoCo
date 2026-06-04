@@ -32,6 +32,7 @@ class Environment:
             mujoco.mjtObj.mjOBJ_BODY,
             end_effector,
         )
+        self.ee_body_name=end_effector
         self.viewer = Viewer(self.model, self.data)
         # self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
         # self.left_initial_T = get_body_T(self.data, self.left_hand_id)

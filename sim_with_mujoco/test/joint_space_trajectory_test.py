@@ -80,12 +80,12 @@ def main():
     trajectory_goal_q = initial_q.copy()
 
     # 주기 상수
-    sim_steps_per_frame = 8
+    sim_steps_per_frame = 1
     steps_per_sim = 8
     poll_interval = 1.0 / 20.0
     render_interval = 1.0 / 60.0
-    last_poll_time = time.time()
-    last_render_time = time.time()
+    last_poll_time = 0
+    last_render_time = 0
 
     # 궤적 형성 관련 변수
     trajectory_start = initial_pose.copy()
@@ -99,7 +99,7 @@ def main():
     q_traj_start = q_des.copy()
     q_traj_goal = q_des.copy()
     trajectory_start_time = None
-    trajectory_duration = 0.08
+    trajectory_duration = 0.4
     # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
@@ -113,10 +113,14 @@ def main():
 
                 now = time.time()
 
-                polled_target = None
+                # polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
-                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+                    polled_target_tmp, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+                    if polled_target_tmp is not polled_target:
+                        polled_target = polled_target_tmp
+                    else:
+                        polled_target = None
 
                 if polled_target is not None:
                     trajectory_goal_T = T_des.copy()

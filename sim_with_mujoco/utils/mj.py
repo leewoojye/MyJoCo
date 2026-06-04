@@ -48,3 +48,9 @@ def dof_ids_from_joints(model, joint_ids):
 def joint_ids_from_names(model, joint_names):
     joint_ids = np.array([mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in joint_names], dtype=int) # 인덱스 자료형 명시
     return joint_ids
+
+def joint_ids_from_body(model, body_id):
+    jnt_adr = model.body_jntadr[body_id]
+    jnt_num = model.body_jntnum[body_id] # body에 달린 joint 개수
+
+    return np.arange(jnt_adr, jnt_adr + jnt_num, dtype=int)

@@ -88,14 +88,16 @@ def main():
     last_render_time = 0
 
     # 궤적 형성 관련 변수
-    trajectory_start = initial_pose.copy()
     trajectory_goal = initial_pose.copy()
     T_des = initial_pose.copy()
-    trajectory_start_time = None
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
-    trajectory_duration = 0.4
+    trajectory_duration = 0.06
+    trajectory_step = (
+        env.model.opt.timestep * steps_per_sim
+    )  # 궤적이 시뮬레이션 루프당 진척되는 정도 (time-scaling 입력 t를 시뮬레이션 루프 주기에 맞춤)
+    # trajectory_step = poll_interval
     # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
@@ -112,16 +114,10 @@ def main():
                 polled_target = None
                 if now - last_poll_time >= poll_interval:  # poll 주기 설정
                     last_poll_time = now
-                    polled_target_tmp, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
-                    if polled_target_tmp is not polled_target:
-                        polled_target = polled_target_tmp
-                    else:
-                        polled_target = None
+                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
 
                 if polled_target is not None:
                     trajectory_goal = T_des.copy()
-                    # trajectory_start = T_des.copy()
-                    # trajectory_start_time = env.data.time
                     # xyz 입력 반영
                     trajectory_goal[:3, 3] = polled_target[:3].copy()
 
@@ -133,43 +129,20 @@ def main():
                     # hand grasp 입력 반영
                     alpha[:] = [polled_target[6], polled_target[7]]
 
-                    # 궤적이 없을 때만 궤적 시발점/출발점 설정, poll 주기마다 start time을 갱신하면 매번 새 궤적이 궤적이 생성되며 t에 변화가 없어짐
-                    if trajectory_start_time is None:
-                        # trajectory_start = T_des.copy()
-                        trajectory_start = get_body_T(env.data, env.ee_body_id)
-                        trajectory_start_time = env.data.time
-
                 twist_des = np.zeros(6)
                 twistdot_des = np.zeros(6)
 
-                if trajectory_start_time is not None:
-                    t = env.data.time - trajectory_start_time  # t: time-scaling이 입력으로 받는 궤적 시점
-
-                    if t >= trajectory_duration:  # 궤적 주기가 끝난 후에는 목표 pose를 고정
-                        T_des = trajectory_goal.copy()
-                        trajectory_start_time = None
-                    else:
-                        # current_target, qacc_des = interpolate_position(  # cubic time-scaling
-                        #     trajectory_start, trajectory_goal, trajectory_duration, t, True
-                        # )
-                        # current_target = interpolate_position_simple(  # 선형 보간
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
-                        # current_target, p_dot_des, p_dotdot_des = interpolate_position_quintic(
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     t,
-                        # )
-                        T_des, twist_des, twistdot_des = interpolate_pose(
-                            trajectory_start,
-                            trajectory_goal,
-                            trajectory_duration,
-                            t,
-                        )
+                pos_err = np.linalg.norm(trajectory_goal[:3, 3] - T_des[:3, 3])
+                rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])
+                if pos_err > 1e-5 or rot_err > 1e-5:
+                    T_des, twist_des, twistdot_des = interpolate_pose(
+                        T_des,
+                        trajectory_goal,
+                        trajectory_duration,
+                        min(trajectory_step, trajectory_duration),
+                    )
+                else:
+                    T_des = trajectory_goal.copy()
 
                 new_target = T_des.copy()
 

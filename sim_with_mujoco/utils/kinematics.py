@@ -1,6 +1,9 @@
 import mujoco
 import numpy as np
 
+from sim.model.math3d.transform import create_transform_matrix
+from sim_with_mujoco.utils.mj import joint_ids_from_body
+
 
 # finger position interpolation: q = (1 - grasp) q_open + grasp q_closed
 def interpolate_finger(model, data, alpha, is_left=False):
@@ -38,6 +41,28 @@ def interpolate_finger(model, data, alpha, is_left=False):
         data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
     return
+
+
+def get_dh_params(model, data, body_id):
+    joint_id = joint_ids_from_body(model, body_id)[0]
+    qpos_id = model.jnt_qposadr[joint_id]
+    child_body_id = np.where(model.body_parentid == body_id)[0] # serial manipulator
+
+    theta = data.qpos[qpos_id]
+
+    pos = model.body_pos[child_body_id]
+    quat = model.body_quat[child_body_id]
+
+    R = np.zeros((3, 3))
+    mujoco.mju_quat2Mat(R.ravel(), quat)  # quaternion->회전행렬 변환
+
+    T = create_transform_matrix(R, pos)
+
+    a = T[0, 3]
+    d = T[2, 3]
+    alpha = np.arctan2(T[2, 1], T[2, 2])
+
+    return a, alpha, d, theta
 
 
 def get_site_jacobian(model, data, site_id):

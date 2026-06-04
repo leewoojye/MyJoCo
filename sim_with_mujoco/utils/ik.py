@@ -42,6 +42,8 @@ def solve_ik(
     ik_data.qvel[:] = data.qvel
     mujoco.mj_forward(model, ik_data)
 
+    max_dq = 0.03
+    max_iter = 50
     iter = 0
     if joint_names is None:
         joint_ids = []
@@ -98,10 +100,11 @@ def solve_ik(
         else:
             dq = J_active.T @ damped_pseudoinverse(J_active @ J_active.T) @ err
 
+        # dq = np.clip(dq, -max_dq, max_dq) # qpos 클리핑시 infeasible한 해가 나올 가능성
         for joint_id, dq_i in zip(joint_ids, dq):
             qadr = model.jnt_qposadr[joint_id]
 
-            dq = np.clip(dq, -0.05, 0.05)
+            # dq = np.clip(dq, -0.05, 0.05)
             ik_data.qpos[qadr] += dq_i
 
             # 관절각 제약 기반 클리핑
@@ -121,7 +124,7 @@ def solve_ik(
         _, err = get_stacked_ik()
         if np.linalg.norm(err) <= 1e-4:
             break
-        if iter > 20:
+        if iter > max_iter:
             break
 
         iter += 1
