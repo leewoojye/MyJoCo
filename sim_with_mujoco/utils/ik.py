@@ -8,7 +8,7 @@ from sim_with_mujoco.utils.math3d import get_body_T
 
 
 # 아무리 특이점에 가까워지더라도 람다 값 때문에 분모가 0이 되지 않아 관절 속도가 안전하게 제한됨
-def damped_pseudoinverse(J, damping=1e-3):
+def damped_pseudoinverse(J, damping=1e-2):
     m = J.shape[0]
     return J.T @ np.linalg.inv(J @ J.T + damping**2 * np.eye(m))
 
@@ -17,7 +17,7 @@ def damped_pseudoinverse(J, damping=1e-3):
 # joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
 # site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
 def solve_ik(
-    model, data, body_id, target_T=None, is_pose=[True, False], joint_names=None, check_collision=False
+    model, data, body_id, target_T=None, is_pose=[True, False], joint_names=None, check_collision=False, damping=1e-2
 ):  # 비고: site_id
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
     if target_T is None:
@@ -100,13 +100,13 @@ def solve_ik(
         rows, cols = J_active.shape
         if rows == cols:
             # dq = np.linalg.pinv(J_active) @ twist_error # Moore–Penrose pseudoinverse
-            dq = damped_pseudoinverse(J_active) @ err
+            dq = damped_pseudoinverse(J_active, damping=damping) @ err
         elif rows > cols:
-            dq = damped_pseudoinverse(J_active.T @ J_active) @ J_active.T @ err
+            dq = damped_pseudoinverse(J_active.T @ J_active, damping=damping) @ J_active.T @ err
         else:
-            dq = J_active.T @ damped_pseudoinverse(J_active @ J_active.T) @ err
+            dq = J_active.T @ damped_pseudoinverse(J_active @ J_active.T, damping=damping) @ err
 
-        dq_norm = np.linalg.norm(dq)
+        dq_norm = np.linalg.norm(dq) # dq는 joint들의 qpos(회전,직선관절은 1크기)를 모은 벡터
         if dq_norm > max_dq_norm:  # IK stride 크기 제한(방향 보존)
             dq = dq / dq_norm * max_dq_norm
         # dq = np.clip(dq, -max_dq, max_dq) # qpos 클리핑시 infeasible한 해가 나올 가능성 있음, 그리고 이는 방향 고려하지 않은 방법
