@@ -107,6 +107,9 @@ class GlfwTargetPanel:
         t = np.clip((mouse_x - (x + 110)) / 160, 0.0, 1.0)
         value = lo + t * (hi - lo)
 
+        if np.isclose(self.offset[index], value):
+            return
+
         self.offset[index] = value
         self.target = self.base_target + self.offset
         self.changed = True

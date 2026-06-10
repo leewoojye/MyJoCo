@@ -45,9 +45,9 @@ def quintic_time_scaling_ros(q_start, q_end, q_dot, q_dotdot, T, t):
     a0 = q_start
     a1 = q_dot
     a2 = 0.5 * q_dotdot
-    a3 = 10.0 * D / T**3 - 4.0 * q_dot / T**2 - 1.5 * q_dotdot / T
-    a4 = -15.0 * D / T**4 + 7.0 * q_dot / T**3 + 1.5 * q_dotdot / T**2
-    a5 = 6.0 * D / T**5 - 3.0 * q_dot / T**4 - 0.5 * q_dotdot / T**3
+    a3 = 10.0 * D / T**3 + 4.0 * q_dot / T**2 + 3.5 * q_dotdot / T
+    a4 = -15.0 * D / T**4 - 7.0 * q_dot / T**3 - 6.0 * q_dotdot / T**2
+    a5 = 6.0 * D / T**5 + 3.0 * q_dot / T**4 + 2.5 * q_dotdot / T**3
 
     q = a0 + a1 * t + a2 * t**2 + a3 * t**3 + a4 * t**4 + a5 * t**5
     qdot = a1 + 2 * a2 * t + 3 * a3 * t**2 + 4 * a4 * t**3 + 5 * a5 * t**4

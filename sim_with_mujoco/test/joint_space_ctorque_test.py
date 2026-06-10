@@ -83,7 +83,7 @@ def main():
     # 주기 상수
     sim_steps_per_frame = 1
     steps_per_sim = 8
-    poll_interval = 1.0 / 20.0
+    poll_interval = 1.0 / 10.0
     render_interval = 1.0 / 60.0
     last_poll_time = 0
     last_render_time = 0
@@ -101,7 +101,7 @@ def main():
     q_dot_traj_start = np.zeros(len(joint_ids))
     q_dotdot_traj_start = np.zeros(len(joint_ids))
     trajectory_start_time = None
-    trajectory_duration = 0.15
+    trajectory_duration = 0.3
 
     # 입력 정보 관리
     polled_target = None
@@ -123,9 +123,7 @@ def main():
                 if polled_target is not None:
                     pending_target = polled_target.copy()
 
-                if pending_target is not None and (
-                    trajectory_start_time is None or env.data.time - trajectory_start_time > trajectory_duration
-                ):  # 만들었던 궤적을 모두 수행해야 새로운 궤적목표 부여
+                if pending_target is not None:  # 
                     trajectory_goal_T = T_des.copy()
                     trajectory_goal_T[:3, 3] = pending_target[:3].copy()  # xyz 입력 반영
 
@@ -145,13 +143,18 @@ def main():
                         check_collision=False,
                     )
                     qpos_ids = env.model.jnt_qposadr[joint_ids]
-                    dof_ids = dof_ids_from_joints(env.model, joint_ids)
-                    q_traj_start = env.data.qpos.copy()
                     q_traj_goal = trajectory_goal_q.copy()
 
                     # 궤적생성시 더 부드러운 궤적을 위해 현재 관절 속도/가속도도 고려함
-                    q_dot_traj_start = env.data.qvel[dof_ids].copy()
-                    q_dotdot_traj_start = env.data.qacc[dof_ids].copy()
+                    # q_traj_start = env.data.qpos.copy()
+                    # q_dot_traj_start = env.data.qvel[dof_ids].copy()
+                    # q_dotdot_traj_start = np.zeros(len(joint_ids))
+                    q_traj_start = (
+                        q_des.copy()
+                    )  # 타임스케일링 함수를 수학적으로 잇기 위해 궤적명령(입력) 그대로 초기화에 사용
+                    q_dot_traj_start = q_dot_des.copy()
+                    q_dotdot_traj_start = q_dotdot_des.copy()
+
                     trajectory_start_time = env.data.time
                     pending_target = None
 
@@ -172,7 +175,7 @@ def main():
                             q_dot_traj_start,
                             q_dotdot_traj_start,
                             trajectory_duration,
-                            t,
+                            min(t, trajectory_duration),  # 궤적목표 지나침 방지
                         )
                         q_des = q_traj_start.copy()
                         q_des[qpos_ids] = q_des_active

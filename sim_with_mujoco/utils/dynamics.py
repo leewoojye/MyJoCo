@@ -40,8 +40,8 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     dof_ids = dof_ids_from_joints(model, joint_ids)
     qpos_ids = model.jnt_qposadr[joint_ids]
     # kp = model.actuator_gainprm[dof_ids, 0]
-    kp = 16
-    kd = 4
+    kp = 300
+    kd = 50
 
     # cmd = kp * (q_des - q) - kd * qdot, 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
     # q_dotdot_des = np.zeros(len(joint_ids))
@@ -52,7 +52,7 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
         + kp * (q_des[qpos_ids] - inv_data.qpos[qpos_ids])
         + kd * (q_dot_des - inv_data.qvel[dof_ids])
     )
-    
+
     inv_data.qacc[dof_ids] = qacc_des
     mujoco.mj_inverse(model, inv_data)  # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
     tau = inv_data.qfrc_inverse[dof_ids]  # qfrc_inverse(inverse 결과 저장용), qfrc_applied(forward, step 입력용)
