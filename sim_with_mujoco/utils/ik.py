@@ -42,7 +42,7 @@ def solve_ik(
     ik_data.qvel[:] = data.qvel
     mujoco.mj_forward(model, ik_data)
 
-    max_dq = 0.03
+    max_dq_norm = 0.03 # iteration마다 qpos stride의 상한선을 설정 
     max_iter = 50
     iter = 0
     if joint_names is None:
@@ -91,6 +91,12 @@ def solve_ik(
 
     while True:
         J_active, err = get_stacked_ik()
+
+        if np.linalg.norm(err) <= 1e-4:
+            break
+        if iter > max_iter:
+            break
+
         rows, cols = J_active.shape
         if rows == cols:
             # dq = np.linalg.pinv(J_active) @ twist_error # Moore–Penrose pseudoinverse
@@ -100,18 +106,21 @@ def solve_ik(
         else:
             dq = J_active.T @ damped_pseudoinverse(J_active @ J_active.T) @ err
 
-        # dq = np.clip(dq, -max_dq, max_dq) # qpos 클리핑시 infeasible한 해가 나올 가능성
+        dq_norm = np.linalg.norm(dq)
+        if dq_norm > max_dq_norm:  # IK stride 크기 제한(방향 보존)
+            dq = dq / dq_norm * max_dq_norm
+        # dq = np.clip(dq, -max_dq, max_dq) # qpos 클리핑시 infeasible한 해가 나올 가능성 있음, 그리고 이는 방향 고려하지 않은 방법
         for joint_id, dq_i in zip(joint_ids, dq):
             qadr = model.jnt_qposadr[joint_id]
 
-            # dq = np.clip(dq, -0.05, 0.05)
             ik_data.qpos[qadr] += dq_i
 
             # 관절각 제약 기반 클리핑
             if model.jnt_limited[joint_id]:
                 q_lower, q_upper = model.jnt_range[joint_id]
                 ik_data.qpos[qadr] = np.clip(ik_data.qpos[qadr], q_lower, q_upper)
-            mujoco.mj_forward(model, ik_data)
+
+        mujoco.mj_forward(model, ik_data)
 
         # mujoco.mj_forward(model, ik_data)
         # kinematic simulator를 위한 충돌 판별
@@ -120,12 +129,12 @@ def solve_ik(
         else:  # 충돌이 아니라면 prev_data 갱신
             mujoco.mj_copyData(prev_data, model, ik_data)
 
-        # forward 이후 갱신된 트위스트(위치) 오차로 종료 조건 검사 (반복문 앞에 배치해도 무관)
-        _, err = get_stacked_ik()
-        if np.linalg.norm(err) <= 1e-4:
-            break
-        if iter > max_iter:
-            break
+        # forward 이후 갱신된 트위스트(위치) 오차로 종료 조건 검사 (반복문 앞에 배치해도 무관한데 최적화를 위해 앞에 배치)
+        # _, err = get_stacked_ik()
+        # if np.linalg.norm(err) <= 1e-4:
+        #     break
+        # if iter > max_iter:
+        #     break
 
         iter += 1
 

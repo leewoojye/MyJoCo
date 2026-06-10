@@ -88,8 +88,8 @@ def main():
     last_render_time = 0
 
     # 궤적 형성 관련 변수
-    trajectory_goal = initial_pose.copy()
-    T_des = initial_pose.copy()
+    trajectory_goal = initial_pose.copy() # 단일 궤적의 목표 지점
+    T_des = initial_pose.copy() # 한 시점의 궤적상 위치
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
@@ -134,7 +134,7 @@ def main():
 
                 pos_err = np.linalg.norm(trajectory_goal[:3, 3] - T_des[:3, 3])
                 rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])
-                if pos_err > 1e-5 or rot_err > 1e-5:
+                if pos_err > 1e-5 or rot_err > 1e-5: # 패널 입력이 바뀌어도 시뮬레이션이 최신 궤적목표를 따라가게 함, low-pass filter 역할
                     T_des, twist_des, twistdot_des = interpolate_pose(
                         T_des,
                         trajectory_goal,
@@ -182,7 +182,7 @@ def main():
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
                     # PD controller
-                    q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
+                    # q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
                     # tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
                     # env.data.qfrc_applied[:] = 0.0
                     # env.data.qfrc_applied[dof_ids] = tau_des
@@ -203,9 +203,10 @@ def main():
 
             now_ren = time.time()
 
-            if now_ren - last_render_time >= render_interval:
-                env.viewer.render()
-                last_render_time = now_ren
+            # if now_ren - last_render_time >= render_interval:
+            #     env.viewer.render()
+            #     last_render_time = now_ren
+            env.viewer.render()
 
     finally:
         env.viewer.terminate_viewer()
