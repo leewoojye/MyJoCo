@@ -80,20 +80,20 @@ def main():
     initial_pose = env.initial_pose
 
     # 주기 상수
-    sim_steps_per_frame = 8
+    sim_steps_per_frame = 1
     steps_per_sim = 8
-    poll_interval = 1.0 / 30.0
+    poll_interval = 1.0 / 20.0
     render_interval = 1.0 / 60.0
-    last_poll_time = time.time()
-    last_render_time = time.time()
+    last_poll_time = 0
+    last_render_time = 0
 
     # 궤적 형성 관련 변수
-    trajectory_start = initial_pose.copy()
-    trajectory_goal = initial_pose.copy()
-    T_des = initial_pose.copy()
-    trajectory_start_time = None
-    trajectory_last_time = 0
-    trajectory_duration = 0.05
+    trajectory_goal = initial_pose.copy()  # 단일 궤적의 목표 지점
+    T_des = initial_pose.copy()  # 한 시점의 궤적상 위치
+    trajectory_duration = 0.06
+    trajectory_step = (
+        env.model.opt.timestep * steps_per_sim
+    )  # 궤적이 시뮬레이션 루프당 진척되는 정도
 
     # 입력 정보 관리
     polled_target = None
@@ -106,13 +106,12 @@ def main():
 
                 now = time.time()
 
-                # polled_target = None
+                polled_target = None
                 if now - last_poll_time >= poll_interval:  # poll 주기 설정
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
 
                 if polled_target is not None:
-                    # trajectory_start = T_des.copy()
                     trajectory_goal = T_des.copy()
                     # xyz 입력 반영
                     trajectory_goal[:3, 3] = polled_target[:3].copy()
@@ -125,26 +124,20 @@ def main():
                     # hand grasp 입력 반영
                     alpha[:] = [polled_target[6], polled_target[7]]
 
-                    if trajectory_start_time is None:
-                        trajectory_start = T_des.copy()
-                        trajectory_start_time = env.data.time
-
                 twist_des = np.zeros(6)
                 twistdot_des = np.zeros(6)
 
-                if trajectory_start_time is not None:
-                    t = env.data.time - trajectory_start_time
-
-                    if t >= trajectory_duration:  # 궤적 주기가 끝난 후에는 목표 pose를 고정
-                        T_des = trajectory_goal.copy()
-                        trajectory_start_time = None
-                    else:
-                        T_des, twist_des, twistdot_des = interpolate_pose(
-                            trajectory_start,
-                            trajectory_goal,
-                            trajectory_duration,
-                            t,
-                        )
+                pos_err = np.linalg.norm(trajectory_goal[:3, 3] - T_des[:3, 3])
+                rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])
+                if pos_err > 1e-5 or rot_err > 1e-5:
+                    T_des, twist_des, twistdot_des = interpolate_pose(
+                        T_des,
+                        trajectory_goal,
+                        trajectory_duration,
+                        min(trajectory_step, trajectory_duration),
+                    )
+                else:
+                    T_des = trajectory_goal.copy()
 
                 new_target = T_des.copy()
 
@@ -210,9 +203,12 @@ def main():
                     # # mujoco.mj_forward(env.model, env.data)
                     # env.step(steps_per_sim)
 
-                    if now - last_render_time >= render_interval:
-                        env.viewer.render()
-                        last_render_time = now
+            now_ren = time.time()
+
+            # if now_ren - last_render_time >= render_interval:
+            #     env.viewer.render()
+            #     last_render_time = now_ren
+            env.viewer.render()
 
     finally:
         env.viewer.terminate_viewer()

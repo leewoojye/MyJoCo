@@ -9,16 +9,19 @@ from sim_with_mujoco.utils.math3d import get_body_T
 
 # 아무리 특이점에 가까워지더라도 람다 값 때문에 분모가 0이 되지 않아 관절 속도가 안전하게 제한됨
 def damped_pseudoinverse(J, damping=1e-2):
-    m = J.shape[0]
-    return J.T @ np.linalg.inv(J @ J.T + damping**2 * np.eye(m))
+    rows, cols = J.shape
+
+    if rows <= cols:
+        return J.T @ np.linalg.inv(J @ J.T + damping**2 * np.eye(rows))
+    
+    return np.linalg.inv(J.T @ J + damping**2 * np.eye(cols)) @ J.T
 
 
 # body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "arm")
-# joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "elbow")
-# site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치/방향 표식
+# site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site") # body(link) 위에 붙여둔 특정 위치 표식
 def solve_ik(
     model, data, body_id, target_T=None, is_pose=[True, False], joint_names=None, check_collision=False, damping=1e-2
-):  # 비고: site_id
+):
     # 궤적 보간 및 rpy는 외부에서 적용하고, 즉 정확한 target pose는 외부에서 설정
     if target_T is None:
         targets = list(body_id)
@@ -42,19 +45,22 @@ def solve_ik(
     ik_data.qvel[:] = data.qvel
     mujoco.mj_forward(model, ik_data)
 
-    max_dq_norm = 0.03 # iteration마다 qpos stride의 상한선을 설정 
+    max_dq_norm = 0.03  # iteration마다 qpos stride의 상한선을 설정
     max_iter = 50
     iter = 0
+
     if joint_names is None:
         joint_ids = []
         body_id = targets[0][0]
-        # e.e->base 방향으로 순회하며 joint id 배열을 구함
-        while body_id > 0:
+
+        while body_id > 0:  # e.e->base 방향으로 순회하며 joint id 배열을 구함
             for jnt_offset in range(model.body_jntnum[body_id]):
                 joint_id = model.body_jntadr[body_id] + jnt_offset
+
                 # e.e->base를 잇는 kinematic tree에 회전/직선 관절만 있다고 가정
                 if model.jnt_type[joint_id] in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
                     joint_ids.append(joint_id)
+
             body_id = model.body_parentid[body_id]
 
         # joint id vs. dof id
@@ -62,6 +68,7 @@ def solve_ik(
         joint_ids = joint_ids[::-1]  # e.e에서 거슬러 올라가 만든 배열을 뒤집음
     else:
         joint_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name) for joint_name in joint_names]
+
     dof_ids = np.array([model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
 
     def get_stacked_ik():  # multi-target에 대해 자코비안 행렬 및 에러의 집합을 반환
@@ -97,22 +104,15 @@ def solve_ik(
         if iter > max_iter:
             break
 
-        rows, cols = J_active.shape
-        if rows == cols:
-            # dq = np.linalg.pinv(J_active) @ twist_error # Moore–Penrose pseudoinverse
-            dq = damped_pseudoinverse(J_active, damping=damping) @ err
-        elif rows > cols:
-            dq = damped_pseudoinverse(J_active.T @ J_active, damping=damping) @ J_active.T @ err
-        else:
-            dq = J_active.T @ damped_pseudoinverse(J_active @ J_active.T, damping=damping) @ err
+        dq = damped_pseudoinverse(J_active, damping=damping) @ err # DLS 함수내에서 행,열 대소를 고려함
 
-        dq_norm = np.linalg.norm(dq) # dq는 joint들의 qpos(회전,직선관절은 1크기)를 모은 벡터
+        dq_norm = np.linalg.norm(dq)  # dq는 joint들의 qpos(회전,직선관절은 1크기)를 모은 벡터
         if dq_norm > max_dq_norm:  # IK stride 크기 제한(방향 보존)
             dq = dq / dq_norm * max_dq_norm
         # dq = np.clip(dq, -max_dq, max_dq) # qpos 클리핑시 infeasible한 해가 나올 가능성 있음, 그리고 이는 방향 고려하지 않은 방법
+
         for joint_id, dq_i in zip(joint_ids, dq):
             qadr = model.jnt_qposadr[joint_id]
-
             ik_data.qpos[qadr] += dq_i
 
             # 관절각 제약 기반 클리핑
@@ -122,7 +122,6 @@ def solve_ik(
 
         mujoco.mj_forward(model, ik_data)
 
-        # mujoco.mj_forward(model, ik_data)
         # kinematic simulator를 위한 충돌 판별
         if check_collision and is_collision(model, ik_data):  # forward 결과가 penetration이면 prev_data로 rollback
             mujoco.mj_copyData(ik_data, model, prev_data)
