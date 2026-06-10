@@ -93,12 +93,12 @@ def main():
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
+    # trajectory_duration = env.model.opt.timestep * 16
     trajectory_duration = 0.06
     trajectory_step = (
         env.model.opt.timestep * steps_per_sim
     )  # 궤적이 시뮬레이션 루프당 진척되는 정도 (time-scaling 입력 t를 시뮬레이션 루프 주기에 맞춤)
     # trajectory_step = poll_interval
-    # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
     polled_target = None
@@ -159,7 +159,6 @@ def main():
                 for _ in range(1):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
                     # 옵션 1: dynamic update (dynamic simulation)
-                    dof_ids = dof_ids_from_joints(env.model, joint_ids)
                     for actuator_id in actuator_ids:
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
@@ -177,15 +176,10 @@ def main():
                     # 손가락 위치 보간
                     interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
                     interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
+
                     # 옵션 1
                     # mujoco.mj_copyData(temp_data, env.model, env.data)
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
-
-                    # PD controller
-                    # q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
-                    # tau_des = pd_controller(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
-                    # env.data.qfrc_applied[:] = 0.0
-                    # env.data.qfrc_applied[dof_ids] = tau_des
 
                     all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
                     all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)

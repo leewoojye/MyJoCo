@@ -123,7 +123,9 @@ def main():
                 if polled_target is not None:
                     pending_target = polled_target.copy()
 
-                if pending_target is not None:  # 
+                if (
+                    pending_target is not None
+                ):  # 주의: 폴링, 궤적형성 및 적용 주기가 서로 같아 폴링 주기가 짧으면 궤적이 너무 자주 바뀜
                     trajectory_goal_T = T_des.copy()
                     trajectory_goal_T[:3, 3] = pending_target[:3].copy()  # xyz 입력 반영
 
@@ -190,7 +192,7 @@ def main():
                     interpolate_finger(env.model, env.data, alpha)
                     interpolate_finger(env.model, env.data, [0, 0], True)
 
-                    # PD controller
+                    # 관절공간에서 computed torque 계산
                     tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
 
                     for i, joint_id in enumerate(joint_ids):

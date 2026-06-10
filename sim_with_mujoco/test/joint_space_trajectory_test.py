@@ -8,6 +8,7 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim.model.motion.trajectory import (
     interpolate_joint,
+    interpolate_joint_ros,
     interpolate_pose,
 )
 from sim_with_mujoco.environment.env import Environment
@@ -82,13 +83,12 @@ def main():
     # 주기 상수
     sim_steps_per_frame = 1
     steps_per_sim = 8
-    poll_interval = 1.0 / 20.0
+    poll_interval = 1.0 / 10.0
     render_interval = 1.0 / 60.0
     last_poll_time = 0
     last_render_time = 0
 
     # 궤적 형성 관련 변수
-    trajectory_start = initial_pose.copy()
     trajectory_goal_T = initial_pose.copy()
     T_des = initial_pose.copy()
 
@@ -98,12 +98,15 @@ def main():
     q_dotdot_des = np.zeros(len(joint_ids))
     q_traj_start = q_des.copy()
     q_traj_goal = q_des.copy()
+    q_dot_traj_start = np.zeros(len(joint_ids))
+    q_dotdot_traj_start = np.zeros(len(joint_ids))
     trajectory_start_time = None
-    trajectory_duration = 0.4
+    trajectory_duration = 0.3
     # trajectory_duration = env.model.opt.timestep * 16
 
     # 입력 정보 관리
     polled_target = None
+    pending_target = None
     alpha = np.zeros(2)
 
     try:
@@ -113,27 +116,26 @@ def main():
 
                 now = time.time()
 
-                # polled_target = None
+                polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
-                    polled_target_tmp, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
-                    if polled_target_tmp is not polled_target:
-                        polled_target = polled_target_tmp
-                    else:
-                        polled_target = None
+                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
 
                 if polled_target is not None:
+                    pending_target = polled_target.copy()
+
+                if pending_target is not None:
                     trajectory_goal_T = T_des.copy()
                     # xyz 입력 반영
-                    trajectory_goal_T[:3, 3] = polled_target[:3].copy()
+                    trajectory_goal_T[:3, 3] = pending_target[:3].copy()
 
                     # rpy 입력 반영
-                    target_rpy = polled_target[3:]
+                    target_rpy = pending_target[3:]
                     target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
                     trajectory_goal_T[:3, :3] = initial_pose[:3, :3] @ target_rot
 
                     # hand grasp 입력 반영
-                    alpha[:] = [polled_target[6], polled_target[7]]
+                    alpha[:] = [pending_target[6], pending_target[7]]
 
                     trajectory_goal_q, joint_ids = solve_ik(
                         env.model,
@@ -143,12 +145,15 @@ def main():
                         joint_names=ik_joint_names,
                         check_collision=False,
                     )
+                    qpos_ids = env.model.jnt_qposadr[joint_ids]
+                    q_traj_goal = trajectory_goal_q.copy()
 
-                    if trajectory_start_time is None:
-                        # q_traj_start = q_des.copy()
-                        q_traj_start = env.data.qpos.copy()
-                        q_traj_goal = trajectory_goal_q.copy()
-                        trajectory_start_time = env.data.time
+                    q_traj_start = q_des.copy()
+                    q_dot_traj_start = q_dot_des.copy()
+                    q_dotdot_traj_start = q_dotdot_des.copy()
+
+                    trajectory_start_time = env.data.time
+                    pending_target = None
 
                 if trajectory_start_time is not None:
                     t = env.data.time - trajectory_start_time
@@ -160,12 +165,20 @@ def main():
                         q_dotdot_des = np.zeros(len(joint_ids))
                         trajectory_start_time = None
                     else:
-                        q_des, q_dot_des, q_dotdot_des = interpolate_joint(
-                            q_traj_start,
-                            q_traj_goal,
+                        qpos_ids = env.model.jnt_qposadr[joint_ids]
+                        q_des_active, q_dot_des, q_dotdot_des = interpolate_joint_ros(
+                            q_traj_start[qpos_ids],
+                            q_traj_goal[qpos_ids],
+                            q_dot_traj_start,
+                            q_dotdot_traj_start,
                             trajectory_duration,
-                            t,
+                            min(t, trajectory_duration),
                         )
+                        q_des = q_traj_start.copy()
+                        q_des[qpos_ids] = q_des_active
+                else:
+                    q_dot_des = np.zeros(len(joint_ids))
+                    q_dotdot_des = np.zeros(len(joint_ids))
 
                 # new_target = T_des.copy()
 
@@ -173,8 +186,6 @@ def main():
 
                 for _ in range(1):  # 수정 예정
                     # 옵션 1: dynamic update (dynamic simulation)
-                    dof_ids = dof_ids_from_joints(env.model, joint_ids)
-
                     for actuator_id in actuator_ids:
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
@@ -193,9 +204,12 @@ def main():
                     env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
                     env.step(steps_per_sim)
 
-                    if now - last_render_time >= render_interval:
-                        env.viewer.render()
-                        last_render_time = now
+            now_ren = time.time()
+
+            # if now_ren - last_render_time >= render_interval:
+            #     env.viewer.render()
+            #     last_render_time = now_ren
+            env.viewer.render()
 
     finally:
         env.viewer.terminate_viewer()

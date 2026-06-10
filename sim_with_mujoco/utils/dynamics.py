@@ -20,6 +20,7 @@ def solve_inverse_dynamics(model, data, qacc):
     data.qacc = qacc.copy()
     mujoco.mj_inverse(model, data)
     qfrc_inverse = data.qfrc_inverse  # inverse dynamics 결과
+    
     return qfrc_inverse.copy()
 
 
@@ -31,7 +32,6 @@ def pd_joint_space():
     return
 
 
-# position actuator를 위한 임시 PD controller
 def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     # inverse dynamic 계산용
     inv_data = mujoco.MjData(model)
@@ -43,9 +43,9 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     kp = 300
     kd = 50
 
-    # cmd = kp * (q_des - q) - kd * qdot, 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
-    # q_dotdot_des = np.zeros(len(joint_ids))
+    #  q_dot_des = q_dotdot_des = 0: 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
     # q_dot_des = np.zeros(len(joint_ids))
+    # q_dotdot_des = np.zeros(len(joint_ids))
 
     qacc_des = (
         q_dotdot_des  # task_to_joint_space()로 인해 active actuator에 대한 원소로만 구성
@@ -70,6 +70,7 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
 
 
 # x_des = target T
+# task-space PD 제어 입력을 joint torque로 바꿈
 def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids):
     dof_ids = np.array([env.model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
     kp = 16

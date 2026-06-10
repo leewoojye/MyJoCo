@@ -146,11 +146,3 @@ def interpolate_joint(q_start, q_end, T, t):
 # ROS 방식: 초기 q, qdot, qdotdot를 사용자로부터 입력받아 waypoint 생성
 def interpolate_joint_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t):
     return quintic_time_scaling_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t)
-
-
-# def trajectory_generator(p_start, p_end, T, dt):
-#     num_point = np.floor(T / dt) + 1
-#     for i in range(num_point):
-#         s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, dt*i)
-
-#     return
