@@ -36,12 +36,34 @@ def quintic_time_scaling(T, t):
     return s_t, s_dot_t, s_ddot_t
 
 
+# 초기 q, qdot, qdotdot은 비영이고 q end는 0을 만족시키는 quintic
+def quintic_time_scaling_ros(q_start, q_end, q_dot, q_dotdot, T, t):
+    t = np.clip(t, 0.0, T)
+
+    D = q_end - (q_start + q_dot * T + 0.5 * q_dotdot * T**2)
+
+    a0 = q_start
+    a1 = q_dot
+    a2 = 0.5 * q_dotdot
+    a3 = 10.0 * D / T**3 - 4.0 * q_dot / T**2 - 1.5 * q_dotdot / T
+    a4 = -15.0 * D / T**4 + 7.0 * q_dot / T**3 + 1.5 * q_dotdot / T**2
+    a5 = 6.0 * D / T**5 - 3.0 * q_dot / T**4 - 0.5 * q_dotdot / T**3
+
+    q = a0 + a1 * t + a2 * t**2 + a3 * t**3 + a4 * t**4 + a5 * t**5
+    qdot = a1 + 2 * a2 * t + 3 * a3 * t**2 + 4 * a4 * t**3 + 5 * a5 * t**4
+    qddot = 2 * a2 + 6 * a3 * t + 12 * a4 * t**2 + 20 * a5 * t**3
+
+    return q, qdot, qddot
+
+
 def interpolate_position_cubic(p_start, p_end, T, t, return_acc=False):
     s_t, _, s_ddot_t = cubic_time_scaling(T, t)
     # s_t, s_dot_t, s_ddot_t = quintic_time_scaling(T, t)
     p_t = p_start + s_t * (p_end - p_start)
+
     if return_acc:
         return p_t, s_ddot_t
+
     return p_t
 
 
@@ -119,6 +141,11 @@ def interpolate_joint(q_start, q_end, T, t):
     q_dotdot_des = s_ddot_t * (q_end - q_start)
 
     return q_des, q_dot_des, q_dotdot_des
+
+
+# ROS 방식: 초기 q, qdot, qdotdot를 사용자로부터 입력받아 waypoint 생성
+def interpolate_joint_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t):
+    return quintic_time_scaling_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t)
 
 
 # def trajectory_generator(p_start, p_end, T, dt):

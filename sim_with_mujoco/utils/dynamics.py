@@ -44,16 +44,17 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     kd = 4
 
     # cmd = kp * (q_des - q) - kd * qdot, 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
-    q_dotdot_des = np.zeros(len(joint_ids))
-    q_dot_des = np.zeros(len(joint_ids))
+    # q_dotdot_des = np.zeros(len(joint_ids))
+    # q_dot_des = np.zeros(len(joint_ids))
 
     qacc_des = (
         q_dotdot_des  # task_to_joint_space()로 인해 active actuator에 대한 원소로만 구성
         + kp * (q_des[qpos_ids] - inv_data.qpos[qpos_ids])
         + kd * (q_dot_des - inv_data.qvel[dof_ids])
     )
+    
     inv_data.qacc[dof_ids] = qacc_des
-    mujoco.mj_inverse(model, inv_data) # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
+    mujoco.mj_inverse(model, inv_data)  # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
     tau = inv_data.qfrc_inverse[dof_ids]  # qfrc_inverse(inverse 결과 저장용), qfrc_applied(forward, step 입력용)
 
     # forcerange 기반 클리핑 (전체 최적화로 계산된 토크 균형이 망가질 것으로 우려, 추후 수정)
@@ -64,6 +65,7 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
         if actuator_id >= 0 and model.actuator_forcelimited[actuator_id]:
             lo, hi = model.actuator_ctrlrange[actuator_id]  # 모델마다 range명 상이
             tau[i] = np.clip(tau[i], lo, hi)
+
     return tau
 
 

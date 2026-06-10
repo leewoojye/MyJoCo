@@ -141,14 +141,14 @@ def main():
 
                 new_target = T_des.copy()
 
-                # q_des, joint_ids = solve_ik(
-                #     env.model,
-                #     env.data,
-                #     [(env.ee_body_id, new_target)],
-                #     is_pose=[True],
-                #     joint_names=ik_joint_names,
-                #     check_collision=False,
-                # )
+                q_des, joint_ids = solve_ik(
+                    env.model,
+                    env.data,
+                    [(env.ee_body_id, new_target)],
+                    is_pose=[True],
+                    joint_names=ik_joint_names,
+                    check_collision=False,
+                )
 
                 for i in range(1):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신

@@ -1,19 +1,14 @@
 
-![Simulator preview](/assets/images/img2.png)
+![Simulator preview](/assets/images/img3.png)
 
 ## DEMO
 
-### 26/05/13
+### 26/06/10
 https://youtu.be/gHD_W7J2Uig
 
 00:00 ~ 01:00 Kinematic Simulator Demo
 
 01:00 ~ 02:00 Dynamic Simulator Demo
-
-### 26/05/11
-https://youtu.be/q49b6CsoBwk
-
-데모영상 초안입니다.
 
 ## Simulator Overview
 
