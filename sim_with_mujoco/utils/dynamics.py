@@ -20,7 +20,7 @@ def solve_inverse_dynamics(model, data, qacc):
     data.qacc = qacc.copy()
     mujoco.mj_inverse(model, data)
     qfrc_inverse = data.qfrc_inverse  # inverse dynamics 결과
-    
+
     return qfrc_inverse.copy()
 
 
@@ -32,7 +32,7 @@ def pd_joint_space():
     return
 
 
-def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
+def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=300, kd=50):
     # inverse dynamic 계산용
     inv_data = mujoco.MjData(model)
     mujoco.mj_copyData(inv_data, model, data)
@@ -40,8 +40,8 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids):
     dof_ids = dof_ids_from_joints(model, joint_ids)
     qpos_ids = model.jnt_qposadr[joint_ids]
     # kp = model.actuator_gainprm[dof_ids, 0]
-    kp = 300
-    kd = 50
+    # kp = 60
+    # kd = 25
 
     #  q_dot_des = q_dotdot_des = 0: 컨트롤러가 목표 궤적이 정지해있다고 인식 (computed torque setpoint control)
     # q_dot_des = np.zeros(len(joint_ids))

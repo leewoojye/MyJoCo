@@ -19,7 +19,7 @@ from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
-XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
+XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
 
 
 def main():
@@ -94,7 +94,7 @@ def main():
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
     # trajectory_duration = env.model.opt.timestep * 16
-    trajectory_duration = 0.06
+    trajectory_duration = 0.2
     trajectory_step = (
         env.model.opt.timestep * steps_per_sim
     )  # 궤적이 시뮬레이션 루프당 진척되는 정도 (time-scaling 입력 t를 시뮬레이션 루프 주기에 맞춤)
@@ -156,15 +156,24 @@ def main():
                     joint_names=ik_joint_names,
                     check_collision=False,
                 )
-                actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
+                
+
+                q_dot_des, q_dotdot_des = env.task_to_joint_space(twist_des, twistdot_des, joint_ids)
 
                 for _ in range(1):  # 수정 예정
-                    # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
-                    # 옵션 1: dynamic update (dynamic simulation)
-                    for actuator_id in actuator_ids:
-                        jid = env.model.actuator_trnid[actuator_id, 0]
-                        qadr = env.model.jnt_qposadr[jid]
-                        env.data.ctrl[actuator_id] = q_des[qadr]  # position actuator ctrl = qpos
+                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 30, 10)
+
+                    for i, joint_id in enumerate(joint_ids):
+                        actuator_id = mujoco.mj_name2id(
+                            env.model,
+                            mujoco.mjtObj.mjOBJ_ACTUATOR,
+                            mujoco.mj_id2name(env.model, mujoco.mjtObj.mjOBJ_JOINT, joint_id),
+                        )
+                        if actuator_id < 0:
+                            continue
+
+                        gear = env.model.actuator_gear[actuator_id, 0]
+                        env.data.ctrl[actuator_id] = tau_des[i] / gear
 
                     # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:
@@ -183,19 +192,10 @@ def main():
                     # mujoco.mj_copyData(temp_data, env.model, env.data)
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
-                    all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
-                    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
-
-                    mujoco.mj_forward(env.model, env.data)
-                    env.data.qfrc_applied[all_dof_ids] = 0.0
-                    env.data.qfrc_applied[all_dof_ids] = env.data.qfrc_bias[all_dof_ids]
-                    # env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
-                    env.step(steps_per_sim)
-
                     # 옵션 2
                     # env.data.qvel[:] = 0.0
                     # # mujoco.mj_forward(env.model, env.data)
-                    # env.step(steps_per_sim)
+                    env.step(steps_per_sim)
 
             now_ren = time.time()
 

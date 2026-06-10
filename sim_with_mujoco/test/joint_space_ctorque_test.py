@@ -53,9 +53,12 @@ def main():
     env.initial_qpos(initial_qpos)
 
     # 임시 MjData (forward, step 중복 계산 방지용)
-    temp_data = mujoco.MjData(env.model)
-    mujoco.mj_copyData(temp_data, env.model, env.data)
-    mujoco.mj_forward(env.model, temp_data)
+    # temp_data = mujoco.MjData(env.model)
+    # mujoco.mj_copyData(temp_data, env.model, env.data)
+    # mujoco.mj_forward(env.model, temp_data)
+
+    # qpos를 q_des로 맞춘 mjData
+    ref_data = mujoco.MjData(env.model)
 
     ik_joint_names = [
         "lift_joint",
@@ -102,10 +105,12 @@ def main():
     q_dotdot_traj_start = np.zeros(len(joint_ids))
     trajectory_start_time = None
     trajectory_duration = 0.3
+    traj_plan_interval = 0.1  # 궤적형성 주기 지정
+    last_traj_plan = 0
 
     # 입력 정보 관리
-    polled_target = None
-    pending_target = None
+    polled_target = None  # polled: 이번 폴링에 새로 들어온 입력
+    pending_target = None  # pending: 아직 궤적에 반영안된 최신 입력
     alpha = np.zeros(2)
 
     try:
@@ -115,42 +120,45 @@ def main():
 
                 now = time.time()
 
+                # polled: 이번 폴링에 새로 들어온 입력, pending: 아직 궤적에 반영안된 최신 입력
                 polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
-                    polled_target, polled_camera = env.viewer.poll_target()  # 매 프레임마다 입력 처리
+                    polled_target, polled_camera = env.viewer.poll_target()
 
                 if polled_target is not None:
                     pending_target = polled_target.copy()
 
                 if (
-                    pending_target is not None
+                    pending_target is not None and now - last_traj_plan >= traj_plan_interval
                 ):  # 주의: 폴링, 궤적형성 및 적용 주기가 서로 같아 폴링 주기가 짧으면 궤적이 너무 자주 바뀜
+                    last_traj_plan = now
                     trajectory_goal_T = T_des.copy()
-                    trajectory_goal_T[:3, 3] = pending_target[:3].copy()  # xyz 입력 반영
+                    trajectory_goal_T[:3, 3] = pending_target[:3].copy()
 
-                    target_rpy = pending_target[3:]  # rpy 입력 반영
+                    target_rpy = pending_target[3:]
                     target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
                     trajectory_goal_T[:3, :3] = initial_pose[:3, :3] @ target_rot
 
-                    # hand grasp 입력 반영
                     alpha[:] = [pending_target[6], pending_target[7]]
+
+                    # ref_data = mujoco.MjData(env.model)
+                    mujoco.mj_copyData(ref_data, env.model, env.data)
+                    ref_data.qpos[:] = q_des
+                    ref_data.qvel[:] = 0.0
+                    mujoco.mj_forward(env.model, ref_data)
 
                     trajectory_goal_q, joint_ids = solve_ik(
                         env.model,
-                        env.data,
+                        ref_data,
                         [(env.ee_body_id, trajectory_goal_T), (env.left_hand_id, env.left_initial_T)],
                         is_pose=[True, False],
                         joint_names=ik_joint_names,
                         check_collision=False,
                     )
-                    qpos_ids = env.model.jnt_qposadr[joint_ids]
                     q_traj_goal = trajectory_goal_q.copy()
 
                     # 궤적생성시 더 부드러운 궤적을 위해 현재 관절 속도/가속도도 고려함
-                    # q_traj_start = env.data.qpos.copy()
-                    # q_dot_traj_start = env.data.qvel[dof_ids].copy()
-                    # q_dotdot_traj_start = np.zeros(len(joint_ids))
                     q_traj_start = (
                         q_des.copy()
                     )  # 타임스케일링 함수를 수학적으로 잇기 위해 궤적명령(입력) 그대로 초기화에 사용
@@ -193,7 +201,7 @@ def main():
                     interpolate_finger(env.model, env.data, [0, 0], True)
 
                     # 관절공간에서 computed torque 계산
-                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids)
+                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 60, 20)
 
                     for i, joint_id in enumerate(joint_ids):
                         actuator_id = None

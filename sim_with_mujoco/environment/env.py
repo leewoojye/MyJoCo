@@ -32,7 +32,7 @@ class Environment:
             mujoco.mjtObj.mjOBJ_BODY,
             end_effector,
         )
-        self.ee_body_name=end_effector
+        self.ee_body_name = end_effector
         self.viewer = Viewer(self.model, self.data)
         # self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
         # self.left_initial_T = get_body_T(self.data, self.left_hand_id)
@@ -93,15 +93,16 @@ class Environment:
     # def set_time(): # mj_step()에서 관리
     #     return
 
-    def get_tick(self):
-        return self.tick
+    # def get_tick(self):
+    #     return self.tick
 
-    def set_tick():
-        return
+    # def set_tick():
+    #     return
 
-    def inc_tick(self):
-        self.tick = self.tick + 1
-        return self.tick
+    # def inc_tick(self):
+    #     self.tick = self.tick + 1
+
+    #     return self.tick
 
     # transformation matrix getter: data.xpos + data.xmat
     # def get_space_T(self, site_id):
@@ -128,6 +129,7 @@ class Environment:
         # ik solver 호출 (보류)
         self.data.qpos = qpos
         mujoco.mj_forward(self.model, self.data)
+
         return
 
     def ik_wrapper():
@@ -153,10 +155,11 @@ class Environment:
 
         qvel = self.data.qvel[dof_ids]  # qdot
 
-        J_inv = damped_pseudoinverse(J, 1e-3)
+        J_inv = damped_pseudoinverse(J)
 
         qdot_des = J_inv @ twist_des
         qddot_des = J_inv @ (twistdot_des - J_dot @ qvel)  # qdot_des를 미분해서 전개한 식
+
         return qdot_des, qddot_des
 
     def get_twist_error(self, target_T):
@@ -164,4 +167,5 @@ class Environment:
         T[:3, 3] = self.data.xpos[self.ee_body_id]
         T[:3, :3] = self.data.xmat[self.ee_body_id].reshape(3, 3)
         _, twist_error = calculate_twist_error(T, target_T)
+
         return twist_error
