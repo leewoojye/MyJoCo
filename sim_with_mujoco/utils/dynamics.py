@@ -3,6 +3,7 @@ import numpy as np
 
 from sim.model.kinematics.ik import calculate_twist_error
 from sim_with_mujoco.environment.env import Environment
+from sim_with_mujoco.utils.ik import damped_pseudoinverse
 from sim_with_mujoco.utils.kinematics import get_body_jacobian
 from sim_with_mujoco.utils.math3d import get_body_twist
 from sim_with_mujoco.utils.mj import dof_ids_from_joints, joint_ids_from_actuators
@@ -69,12 +70,11 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=30
     return tau
 
 
-# x_des = target T
 # task-space PD 제어 입력을 joint torque로 바꿈
-def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids):
+def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids, kp=16, kd=4):
     dof_ids = np.array([env.model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
-    kp = 16
-    kd = 4
+    # kp = 100
+    # kd = 30
 
     twist_current = get_body_twist(env.model, env.data, env.ee_body_id, joint_ids)
     twist_error = env.get_twist_error(x_des)
@@ -84,10 +84,6 @@ def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids):
     tau = J.T @ cmd
 
     return tau
-
-
-def ct_task_space():
-    return
 
 
 def pid_controller():

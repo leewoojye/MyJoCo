@@ -55,7 +55,7 @@ class Environment:
             actuator_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
             qadr = self.model.jnt_qposadr[joint_id]
             self.data.qpos[qadr] = value
-            # self.data.ctrl[actuator_id] = self.data.qpos[qadr]
+            self.data.ctrl[actuator_id] = self.data.qpos[qadr]
 
         # qpos/qvel/ctrl 기준으로 kinematics + velocity, force, qacc 등등 계산
         mujoco.mj_forward(self.model, self.data)

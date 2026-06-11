@@ -54,9 +54,11 @@ def main():
     env.initial_qpos(initial_qpos)
 
     # 임시 MjData (forward, step 중복 계산 방지용)
-    temp_data = mujoco.MjData(env.model)
-    mujoco.mj_copyData(temp_data, env.model, env.data)
-    mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
+    # temp_data = mujoco.MjData(env.model)
+    # mujoco.mj_copyData(temp_data, env.model, env.data)
+    # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
+    # qpos를 q_des로 맞춘 mjData
+    ref_data = mujoco.MjData(env.model)
 
     ik_joint_names = [
         "lift_joint",
@@ -78,6 +80,8 @@ def main():
     env.viewer.init_viewer(env.initial_target_pos)
     initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
+    initial_q = env.initial_q
+    q_des = initial_q.copy()
 
     # 주기 상수
     sim_steps_per_frame = 1
@@ -91,9 +95,7 @@ def main():
     trajectory_goal = initial_pose.copy()  # 단일 궤적의 목표 지점
     T_des = initial_pose.copy()  # 한 시점의 궤적상 위치
     trajectory_duration = 0.06
-    trajectory_step = (
-        env.model.opt.timestep * steps_per_sim
-    )  # 궤적이 시뮬레이션 루프당 진척되는 정도
+    trajectory_step = env.model.opt.timestep * steps_per_sim  # 궤적이 시뮬레이션 루프당 진척되는 정도
 
     # 입력 정보 관리
     polled_target = None
@@ -141,9 +143,14 @@ def main():
 
                 new_target = T_des.copy()
 
+                mujoco.mj_copyData(ref_data, env.model, env.data)
+                ref_data.qpos[:] = q_des
+                ref_data.qvel[:] = 0.0
+                mujoco.mj_forward(env.model, ref_data)
+
                 q_des, joint_ids = solve_ik(
                     env.model,
-                    env.data,
+                    ref_data,
                     [(env.ee_body_id, new_target)],
                     is_pose=[True],
                     joint_names=ik_joint_names,
@@ -161,7 +168,7 @@ def main():
 
                     # PD controller
                     joint_ids = joint_ids_from_names(env.model, ik_joint_names)
-                    tau_des = pd_task_space(env, T_des, twist_des, twistdot_des, joint_ids)
+                    tau_des = pd_task_space(env, T_des, twist_des, twistdot_des, joint_ids, 100, 30)
 
                     for i, joint_id in enumerate(joint_ids):
                         actuator_id = None

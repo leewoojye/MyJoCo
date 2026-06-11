@@ -25,8 +25,9 @@ def interpolate_finger(model, data, alpha, is_left=False):
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         qadr = model.jnt_qposadr[joint_id]
         value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
-        data.qpos[qadr] = value
+        # data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
+
     # 네 손가락 관절 보간
     for i in range(5, 21):
         if is_left:
@@ -38,15 +39,14 @@ def interpolate_finger(model, data, alpha, is_left=False):
         q_closed = model.jnt_range[joint_id, 1]
         qadr = model.jnt_qposadr[joint_id]
         value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-        data.qpos[qadr] = value
+        # data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
-    return
 
 
 def get_dh_params(model, data, body_id):
     joint_id = joint_ids_from_body(model, body_id)[0]
     qpos_id = model.jnt_qposadr[joint_id]
-    child_body_id = np.where(model.body_parentid == body_id)[0] # serial manipulator
+    child_body_id = np.where(model.body_parentid == body_id)[0]  # serial manipulator
 
     theta = data.qpos[qpos_id]
 
