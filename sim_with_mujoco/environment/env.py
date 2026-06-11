@@ -23,7 +23,7 @@ class Environment:
 
     # viewer, environment(simulator state management) 분리
     # main.py는 렌더링 루프, 시뮬레이션 루프 이중 반복문 구조
-    # main.py에서 view(mujoco viewer, glfw panel), env 인스턴스 생성 -> 매 렌더링마다 panel state polling -> polled target으로 ik solver 호출 -> 목표 관절각 env.forward() ->
+    # main.py에서 view(mujoco viewer, glfw panel), env 인스턴스 생성 -> 매 렌더링마다 panel state polling -> polled target으로 ik solver 호출 -> 목표 관절각 env.forward() -> ...
 
     def __init__(self, xml_path, end_effector):
         self.model, self.data = parser(xml_path)
@@ -65,7 +65,9 @@ class Environment:
         self.initial_pose = get_body_T(self.data, self.ee_body_id)
         self.initial_q = self.data.qpos.copy()
 
-        self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
+        self.left_hand_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7"
+        )  # 추후 수정, hx5_l_base, arm_l_link7
         self.left_initial_T = get_body_T(self.data, self.left_hand_id)
 
     # step() wrapper
