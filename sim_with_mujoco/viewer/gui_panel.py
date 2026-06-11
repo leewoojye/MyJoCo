@@ -5,6 +5,10 @@ import numpy as np
 
 class GUIPanel:
     AXES = ("azimuth", "elevation", "distance", "lookat_z")
+    LABEL_WIDTH = 105
+    LABEL_HEIGHT = 28
+    TEXT_CHAR_WIDTH = 10
+    TEXT_BASELINE_OFFSET = 2
 
     def __init__(
         self,
@@ -53,18 +57,21 @@ class GUIPanel:
             x = max(20, width - 610)
 
             mujoco.mjr_rectangle(
-                mujoco.MjrRect(x, y, 105, 28),
+                mujoco.MjrRect(x, y, self.LABEL_WIDTH, self.LABEL_HEIGHT),
                 0.1,
                 0.1,
                 0.1,
                 0.8,
             )
+            text_width = len(axis) * self.TEXT_CHAR_WIDTH
+            text_x = x + (self.LABEL_WIDTH - text_width) / 2
+            text_y = y + self.TEXT_BASELINE_OFFSET
             mujoco.mjr_text(
                 mujoco.mjtFont.mjFONT_NORMAL,
                 axis,
                 context,
-                (x + 8) / max(width, 1),
-                (y + 5) / max(height, 1),
+                text_x / max(width, 1),
+                text_y / max(height, 1),
                 1.0,
                 1.0,
                 1.0,

@@ -38,19 +38,14 @@ class Viewer:
         self.opt = mujoco.MjvOption()  # 시각화 대상 설정 옵션
         mujoco.mjv_defaultOption(self.opt)
 
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
         self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
         self.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = True
+        self.opt.flags[mujoco.mjtVisFlag.mjVIS_BODYBVH] = True # self-collision 탐지용 바운딩박스 시각화
 
         self.model.vis.scale.contactwidth = 0.2
         self.model.vis.scale.contactheight = 0.03
         self.model.vis.rgba.contactpoint[:] = [1.0, 0.15, 0.05, 1.0]
-        self.model.vis.map.force = 0.001
-        self.model.vis.scale.forcewidth = 0.01
-        self.model.vis.scale.jointlength = 0.10
-        self.model.vis.scale.jointwidth = 0.01
-        self.model.vis.scale.actuatorlength = 1.0
-        self.model.vis.scale.actuatorwidth = 0.1
 
         self.scene = mujoco.MjvScene(self.model, maxgeom=10000)
         self.context = mujoco.MjrContext(
