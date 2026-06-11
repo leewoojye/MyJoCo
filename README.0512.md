@@ -1,5 +1,5 @@
 
-![Simulator preview](/assets/images/img2.png)
+![Simulator preview](/assets/images/img4.png)
 
 ## DEMO
 
@@ -19,7 +19,7 @@ This project is a custom robotics simulator for experimenting with a ROBOTIS FFW
 
 The simulator loads MuJoCo XML assets, converts robot geometry into Open3D meshes, and runs a kinematics-based interaction loop.
 
-Check out the more detailed implementation journey here! https://leewoojye.github.io/research/2026/05/02/sim_from_scratch.html
+Check out the more detailed implementation journey here! https://leewoojye.github.io/research/2026/06/03/myjoco2.html
 
 ## How to Use
 

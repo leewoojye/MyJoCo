@@ -41,7 +41,7 @@ class Viewer:
         # self.opt.flags[mujoco.mjtVisFlag.mjVIS_JOINT] = True
         self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
         self.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = True
-        self.opt.flags[mujoco.mjtVisFlag.mjVIS_BODYBVH] = True # self-collision 탐지용 바운딩박스 시각화
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_BODYBVH] = True # self-collision 탐지용 바운딩박스 시각화
 
         self.model.vis.scale.contactwidth = 0.2
         self.model.vis.scale.contactheight = 0.03

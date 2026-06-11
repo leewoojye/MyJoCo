@@ -14,11 +14,12 @@ from sim.model.motion.trajectory import (
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.dynamics import ct_joint_space
 from sim_with_mujoco.utils.ik import solve_ik
-from sim_with_mujoco.utils.kinematics import interpolate_finger
+from sim_with_mujoco.utils.kinematics import interpolate_finger, interpolate_finger_motor
 from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
-XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
+# XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
+XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms_fingers.xml"
 
 
 def main():
@@ -104,8 +105,8 @@ def main():
     q_dot_traj_start = np.zeros(len(joint_ids))
     q_dotdot_traj_start = np.zeros(len(joint_ids))
     trajectory_start_time = None
-    trajectory_duration = 0.3
-    traj_plan_interval = 0.1  # 궤적형성 주기 지정
+    trajectory_duration = 3.0
+    traj_plan_interval = 0.8  # 궤적형성 주기 지정
     last_traj_plan = 0
 
     # 입력 정보 관리
@@ -197,11 +198,11 @@ def main():
                     # 옵션 1: dynamic update (dynamic simulation)
                     qpos_ids = env.model.jnt_qposadr[joint_ids]
 
-                    interpolate_finger(env.model, env.data, alpha)
-                    interpolate_finger(env.model, env.data, [0, 0], True)
+                    interpolate_finger_motor(env.model, env.data, alpha)
+                    interpolate_finger_motor(env.model, env.data, [0, 0], True)
 
                     # 관절공간에서 computed torque 계산
-                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 60, 20)
+                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 40, 12)
 
                     for i, joint_id in enumerate(joint_ids):
                         actuator_id = None
@@ -217,7 +218,11 @@ def main():
                             continue
 
                         gear = env.model.actuator_gear[actuator_id, 0]
-                        env.data.ctrl[actuator_id] = tau_des[i] / gear
+                        ctrl = tau_des[i] / gear
+                        if env.model.actuator_ctrllimited[actuator_id]:
+                            lo, hi = env.model.actuator_ctrlrange[actuator_id]
+                            ctrl = np.clip(ctrl, lo, hi)
+                        env.data.ctrl[actuator_id] = ctrl
 
                     env.step(steps_per_sim)
 

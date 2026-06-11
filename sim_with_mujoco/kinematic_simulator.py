@@ -1,4 +1,5 @@
 import time
+from tkinter.tix import Tree
 
 import glfw
 import mujoco
@@ -157,8 +158,10 @@ def main():
                         env.data.ctrl[actuator_id] = q_des[qadr]
 
                     # 손가락 위치 보간
-                    interpolate_finger(env.model, env.data, alpha)  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
-                    interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
+                    interpolate_finger(
+                        env.model, env.data, alpha, False, True
+                    )  # data.qpos를 갱신중, ctrl을 갱신하도록 수정?
+                    interpolate_finger(env.model, env.data, [0, 0], True, True)  # 왼손 자세 유지
                     # 옵션 1
                     # mujoco.mj_forward(env.model, env.data)  # qfrc_bias 계산을 위한 forward
                     # env.data.qfrc_applied[:] = 0.0

@@ -6,16 +6,14 @@ from sim_with_mujoco.utils.mj import joint_ids_from_body
 
 
 # finger position interpolation: q = (1 - grasp) q_open + grasp q_closed
-def interpolate_finger(model, data, alpha, is_left=False):
+def interpolate_finger(model, data, alpha, is_left=False, is_kinematic=False):
     # 네 손가락을 위한 초기 자세
     q_open = 0
-    # spread_joints = {5, 9, 13, 17}
 
     # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
     # 엄지 자세 q를 배열로 표현
     q_open_list = [0.3, -1.57, 0.35, 0.25]
     q_closed_list = [0.4, -1.25, 0.8, 0.7]
-    # finger_open = [0.0, 0.45, 0.35, 0.25]
 
     # 엄지 관절 보간
     for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
@@ -28,6 +26,9 @@ def interpolate_finger(model, data, alpha, is_left=False):
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
 
         value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
+        if is_kinematic:
+            data.qpos[actuator_id] = value
+            continue
         data.ctrl[actuator_id] = value
 
     # 네 손가락 관절 보간
@@ -40,17 +41,63 @@ def interpolate_finger(model, data, alpha, is_left=False):
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
 
-        # if i in spread_joints:
-        #     value = 0.0  # 손가락 벌림 고정
-        # else:
-        #     q_closed = model.jnt_range[joint_id, 1]
-        #     value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-
-        # finger_joint_index = (i - 5) % 4
-        # q_open = finger_open[finger_joint_index]
         q_closed = model.jnt_range[joint_id, 1]
         value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        if is_kinematic:
+            data.qpos[actuator_id] = value
+            continue
         data.ctrl[actuator_id] = value
+
+
+def interpolate_finger_motor(model, data, alpha, is_left=False, is_kinematic=False):
+    kp = 2.0
+    kd = 0.2
+    q_open = 0
+    q_open_list = [0.3, -1.57, 0.35, 0.25]
+    q_closed_list = [0.4, -1.25, 0.8, 0.7]
+
+    def set_joint(joint_name, q_des):
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+        if joint_id < 0 or actuator_id < 0:
+            return
+
+        qadr = model.jnt_qposadr[joint_id]
+        dadr = model.jnt_dofadr[joint_id]
+
+        if is_kinematic:
+            data.qpos[qadr] = q_des
+            return
+
+        if model.actuator_biastype[actuator_id] != mujoco.mjtBias.mjBIAS_NONE:
+            ctrl = q_des
+        else:
+            ctrl = kp * (q_des - data.qpos[qadr]) - kd * data.qvel[dadr]
+
+        if model.actuator_ctrllimited[actuator_id]:
+            lo, hi = model.actuator_ctrlrange[actuator_id]
+            ctrl = np.clip(ctrl, lo, hi)
+        data.ctrl[actuator_id] = ctrl
+
+    for index, i in enumerate(range(1, 5)):
+        if is_left:
+            joint_name = f"finger_l_joint{i}"
+        else:
+            joint_name = f"finger_r_joint{i}"
+
+        q_des = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
+        set_joint(joint_name, q_des)
+
+    for i in range(5, 21):
+        if is_left:
+            joint_name = f"finger_l_joint{i}"
+        else:
+            joint_name = f"finger_r_joint{i}"
+
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        q_closed = model.jnt_range[joint_id, 1]
+        q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        set_joint(joint_name, q_des)
 
 
 def get_dh_params(model, data, body_id):
