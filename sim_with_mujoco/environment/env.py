@@ -59,6 +59,7 @@ class Environment:
 
         # qpos/qvel/ctrl 기준으로 kinematics + velocity, force, qacc 등등 계산
         mujoco.mj_forward(self.model, self.data)
+
         # 초기 목표 위치 및 자세 저장
         self.initial_target_pos = self.data.xpos[self.ee_body_id].copy()
         self.initial_pose = get_body_T(self.data, self.ee_body_id)
@@ -66,7 +67,6 @@ class Environment:
 
         self.left_hand_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "arm_l_link7")  # 추후 수정
         self.left_initial_T = get_body_T(self.data, self.left_hand_id)
-        return
 
     # step() wrapper
     def step(self, nstep=1):

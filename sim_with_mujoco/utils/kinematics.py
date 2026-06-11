@@ -9,12 +9,13 @@ from sim_with_mujoco.utils.mj import joint_ids_from_body
 def interpolate_finger(model, data, alpha, is_left=False):
     # 네 손가락을 위한 초기 자세
     q_open = 0
-    spread_joints = {5, 9, 13, 17}
+    # spread_joints = {5, 9, 13, 17}
 
     # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
     # 엄지 자세 q를 배열로 표현
     q_open_list = [0.3, -1.57, 0.35, 0.25]
     q_closed_list = [0.4, -1.25, 0.8, 0.7]
+    # finger_open = [0.0, 0.45, 0.35, 0.25]
 
     # 엄지 관절 보간
     for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
@@ -22,11 +23,11 @@ def interpolate_finger(model, data, alpha, is_left=False):
             joint_name = f"finger_l_joint{i}"
         else:
             joint_name = f"finger_r_joint{i}"
+
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-        qadr = model.jnt_qposadr[joint_id]
+
         value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
-        # data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
 
     # 네 손가락 관절 보간
@@ -35,17 +36,20 @@ def interpolate_finger(model, data, alpha, is_left=False):
             joint_name = f"finger_l_joint{i}"
         else:
             joint_name = f"finger_r_joint{i}"
+
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-        qadr = model.jnt_qposadr[joint_id]
+
         # if i in spread_joints:
         #     value = 0.0  # 손가락 벌림 고정
         # else:
         #     q_closed = model.jnt_range[joint_id, 1]
         #     value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+
+        # finger_joint_index = (i - 5) % 4
+        # q_open = finger_open[finger_joint_index]
         q_closed = model.jnt_range[joint_id, 1]
         value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-        # data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
 
 

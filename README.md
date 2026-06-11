@@ -116,7 +116,9 @@ sim/model/motion/
 
 ## References
 
-- Modern Robotics Official lecture slides: Ch. 2 Configuration Space, Ch. 3 Rigid-Body Motions, Ch. 4 Forward Kinematics, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, and Ch. 12 Grasping and Manipulation.
+- Modern Robotics Official lecture slides: Ch. 2 Configuration Space, Ch. 3 Rigid-Body Motions, Ch. 4 Forward Kinematics, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, Ch. 11 Robot Control, and Ch. 12 Grasping and Manipulation.
+- ROS 2 control joint trajectory controller trajectory documentation: https://control.ros.org/master/doc/ros2_controllers/joint_trajectory_controller/doc/trajectory.html
+- dm_control repository: [google-deepmind/dm_control](https://github.com/google-deepmind/dm_control)
 - MuJoCo XML modeling and computation documentation.
 - ROBOTIS MuJoCo Menagerie assets: https://github.com/ROBOTIS-GIT/robotis_mujoco_menagerie
 - SPOTS object assets: https://github.com/joonhyung-lee/spots

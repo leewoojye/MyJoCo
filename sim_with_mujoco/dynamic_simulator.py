@@ -180,7 +180,6 @@ def main():
 
                 new_target = T_des.copy()
 
-                # ref_data = mujoco.MjData(env.model)
                 mujoco.mj_copyData(ref_data, env.model, env.data)
                 ref_data.qpos[:] = q_des
                 ref_data.qvel[:] = 0.0
@@ -220,13 +219,16 @@ def main():
                     # mujoco.mj_copyData(temp_data, env.model, env.data)
                     # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
 
-                    all_joint_ids = joint_ids_from_names(env.model, ik_joint_names)
+                    finger_joint_names = [f"finger_r_joint{i}" for i in range(1, 21)] + [
+                        f"finger_l_joint{i}" for i in range(1, 21)
+                    ]
+                    gravity_joint_names = ik_joint_names + finger_joint_names
+                    all_joint_ids = joint_ids_from_names(env.model, gravity_joint_names)
                     all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
 
                     mujoco.mj_forward(env.model, env.data)
                     env.data.qfrc_applied[all_dof_ids] = 0.0
                     env.data.qfrc_applied[all_dof_ids] = env.data.qfrc_bias[all_dof_ids]
-                    # env.data.qfrc_applied[all_dof_ids] = temp_data.qfrc_bias[all_dof_ids]
                     env.step(steps_per_sim)
 
                     # 옵션 2
