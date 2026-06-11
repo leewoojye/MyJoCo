@@ -58,6 +58,7 @@ def main():
     temp_data = mujoco.MjData(env.model)
     mujoco.mj_copyData(temp_data, env.model, env.data)
     mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
+    ref_data = mujoco.MjData(env.model)
 
     ik_joint_names = [
         "lift_joint",
@@ -79,6 +80,8 @@ def main():
     env.viewer.init_viewer(env.initial_target_pos)
     initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
+    initial_q = env.initial_q
+    q_des = initial_q.copy()
 
     # 주기 상수
     sim_steps_per_frame = 1
@@ -92,19 +95,24 @@ def main():
     trajectory_start = initial_pose.copy()  # 단일 궤적의 시작 지점
     trajectory_goal = initial_pose.copy()  # 단일 궤적의 목표 지점
     T_des = initial_pose.copy()  # 한 시점의 궤적상 위치
+    twist_des = np.zeros(6)
+    twistdot_des = np.zeros(6)
+    trajectory_start_twist = np.zeros(6)
+    trajectory_start_twistdot = np.zeros(6)
     # trajectory_duration = (
     #     env.model.opt.timestep * sim_steps_per_frame
     # )  # 고정값이 아닌 target까지 거리와 루프 주기를 고려해 동적으로 변하도록 수정하기 (env.data.time 또는 model.opt.timestep 기반으로 잡기)
     # trajectory_duration = env.model.opt.timestep * 16
     trajectory_start_time = None
     trajectory_duration = 0.06
+    trajectory_step = env.model.opt.timestep * steps_per_sim  # 궤적이 시뮬레이션 루프당 진척되는 정도
     traj_plan_interval = poll_interval  # 궤적형성 주기 지정
     last_traj_plan = 0
 
     # 입력 정보 관리
     polled_target = None  # polled: 이번 폴링에 새로 들어온 입력
     pending_target = None  # pending: 아직 궤적에 반영안된 최신 입력
-    alpha = np.zeros(2)
+    alpha = [0, 0]
 
     try:
         while not glfw.window_should_close(env.viewer.window):  # 렌더링 루프 (프레임 단위)
@@ -124,6 +132,8 @@ def main():
                 if pending_target is not None and now - last_traj_plan >= traj_plan_interval:
                     last_traj_plan = now
                     trajectory_start = T_des.copy()
+                    trajectory_start_twist = twist_des.copy()
+                    trajectory_start_twistdot = twistdot_des.copy()
                     trajectory_goal = trajectory_start.copy()
 
                     # xyz 입력 반영
@@ -139,13 +149,13 @@ def main():
                     trajectory_start_time = env.data.time
                     pending_target = None
 
-                twist_des = np.zeros(6)
-                twistdot_des = np.zeros(6)
-
                 if trajectory_start_time is not None:
-                    t = env.data.time - trajectory_start_time
-                    if t >= trajectory_duration:
+                    pos_err = np.linalg.norm(trajectory_goal[:3, 3] - T_des[:3, 3])
+                    rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])
+                    if pos_err <= 1e-5 and rot_err <= 1e-5:
                         T_des = trajectory_goal.copy()
+                        twist_des = np.zeros(6)
+                        twistdot_des = np.zeros(6)
                         trajectory_start_time = None
                     else:
                         # T_des, twist_des, twistdot_des = interpolate_pose(
@@ -157,17 +167,28 @@ def main():
                         T_des, twist_des, twistdot_des = interpolate_pose_ros(
                             trajectory_start,
                             trajectory_goal,
+                            trajectory_start_twist,
+                            trajectory_start_twistdot,
                             trajectory_duration,
-                            min(t, trajectory_duration),
+                            min(trajectory_step, trajectory_duration),
                         )
+                        trajectory_start = T_des.copy()
+                        trajectory_start_twist = twist_des.copy()
+                        trajectory_start_twistdot = twistdot_des.copy()
                 else:
                     T_des = trajectory_goal.copy()
 
                 new_target = T_des.copy()
 
+                # ref_data = mujoco.MjData(env.model)
+                mujoco.mj_copyData(ref_data, env.model, env.data)
+                ref_data.qpos[:] = q_des
+                ref_data.qvel[:] = 0.0
+                mujoco.mj_forward(env.model, ref_data)
+
                 q_des, joint_ids = solve_ik(
                     env.model,
-                    env.data,
+                    ref_data,
                     [(env.ee_body_id, new_target), (env.left_hand_id, env.left_initial_T)],
                     is_pose=[True, False],
                     joint_names=ik_joint_names,
@@ -181,7 +202,7 @@ def main():
                     for actuator_id in actuator_ids:
                         jid = env.model.actuator_trnid[actuator_id, 0]
                         qadr = env.model.jnt_qposadr[jid]
-                        env.data.ctrl[actuator_id] = q_des[qadr]  # position actuator ctrl = qpos
+                        env.data.ctrl[actuator_id] = q_des[qadr]
 
                     # 옵션 2: kinematic update (kinematic simulation)
                     # for joint_id in joint_ids:

@@ -9,6 +9,7 @@ from sim_with_mujoco.utils.mj import joint_ids_from_body
 def interpolate_finger(model, data, alpha, is_left=False):
     # 네 손가락을 위한 초기 자세
     q_open = 0
+    spread_joints = {5, 9, 13, 17}
 
     # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
     # 엄지 자세 q를 배열로 표현
@@ -36,8 +37,13 @@ def interpolate_finger(model, data, alpha, is_left=False):
             joint_name = f"finger_r_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-        q_closed = model.jnt_range[joint_id, 1]
         qadr = model.jnt_qposadr[joint_id]
+        # if i in spread_joints:
+        #     value = 0.0  # 손가락 벌림 고정
+        # else:
+        #     q_closed = model.jnt_range[joint_id, 1]
+        #     value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        q_closed = model.jnt_range[joint_id, 1]
         value = (1 - alpha[1]) * q_open + alpha[1] * q_closed
         # data.qpos[qadr] = value
         data.ctrl[actuator_id] = value
