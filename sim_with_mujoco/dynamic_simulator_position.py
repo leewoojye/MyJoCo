@@ -158,12 +158,6 @@ def main():
                         twistdot_des = np.zeros(6)
                         trajectory_start_time = None
                     else:
-                        # T_des, twist_des, twistdot_des = interpolate_pose(
-                        #     trajectory_start,
-                        #     trajectory_goal,
-                        #     trajectory_duration,
-                        #     min(t, trajectory_duration),
-                        # )
                         T_des, twist_des, twistdot_des = interpolate_pose_ros(
                             trajectory_start,
                             trajectory_goal,

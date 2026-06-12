@@ -8,15 +8,19 @@ https://youtu.be/gHD_W7J2Uig
 
 00:00 ~ 01:00 Kinematic Simulator Demo
 
-01:00 ~ 02:00 Dynamic Simulator Demo
+01:00 ~ 02:00 Dynamic Simulator (position actuator) Demo
+
+01:00 ~ 02:00 Dynamic Simulator (motor actuator) Demo
 
 ## Simulator Overview
 
 Myjoco(feat. mujoco)는 구버전인 mujoco-free 시뮬레이터를 mujoco-based 시뮬레이터로 재탄생한 프로젝트입니다. mjcf을 제외한 Myjoco 코드는 from scratch로 만들어졌으며 제어 및 강화학습으로의 확장을 목표로 합니다.
 
-Check out the more detailed implementation journey here!
+Check out the more detailed implementation journey here !
 
 https://leewoojye.github.io/research/2026/06/03/myjoco2.html
+
+[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe !
 
 ## How to Use
 
@@ -35,22 +39,22 @@ pip install -r requirements.txt
 
 Run the simulator:
 
-**Dynamic Simulator**
+**Dynamic Simulator using position actuator**
 
 ```bash
-python3 -m sim_with_mujoco.dynamic_simulator
+python3 -m sim_with_mujoco.dynamic_simulator_position
+```
+
+**Dynamic Simulator using motor actuator**
+
+```bash
+python3 -m sim_with_mujoco.dynamic_simulator_motor
 ```
 
 **Kinematic Simulator**
 
 ```bash
 python3 -m sim_with_mujoco.kinematic_simulator
-```
-
-**Joint space computed torque (with motor actuator)**
-
-```bash
-python3 -m sim_with_mujoco.test.joint_space_ctorque_test
 ```
 
 Use the right-side GUI panels to move the right hand target and control the right-hand grasp sliders.

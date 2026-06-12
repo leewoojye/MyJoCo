@@ -1,7 +1,6 @@
 import mujoco
 import numpy as np
 
-from sim.model.kinematics.ik import calculate_twist_error
 from sim.model.motion.trajectory import interpolate_joint_ros, interpolate_pose
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.math3d import get_body_T, get_singular_values
@@ -22,22 +21,10 @@ def plan_cartesian_trajectory(
     duration,
     step_distance=0.01,  # task-space 상 이동거리단위
     check_collision=False,
-    damping=1e-2,
-    pose_threshold=1e-3,
-    joint_step_limit=0.35,
-    singularity_threshold=None,
+    damping=1e-2,  # ik solving에 사용되는 damping 계수
+    singularity_threshold=1e-3,
     max_attempt=3,
 ):
-    # 현재 pose와 목표 pose/position 사이의 오차 norm 계산
-    def pose_error_norm(check_data, target_body_id, T_des, is_pose):
-        T_curr = get_body_T(check_data, target_body_id)
-
-        if is_pose:
-            _, err = calculate_twist_error(T_curr, T_des)
-            return np.linalg.norm(err)
-
-        return np.linalg.norm(T_des[:3, 3] - T_curr[:3, 3])
-
     body_id, target_T = targets[0]
     start_T = get_body_T(data, body_id)
     distance = np.linalg.norm(target_T[:3, 3] - start_T[:3, 3])
@@ -83,16 +70,7 @@ def plan_cartesian_trajectory(
         check_data.qvel[:] = 0.0
         mujoco.mj_forward(model, check_data)
 
-        target_errors = [
-            pose_error_norm(check_data, target_body_id, target_T_i, target_is_pose)
-            for (target_body_id, target_T_i), target_is_pose in zip(waypoint_targets, is_pose)
-        ]
-        max_pose_error = max(target_errors)
-
-        qpos_ids = model.jnt_qposadr[joint_ids]
-        dq = q_i[qpos_ids] - q_prev[qpos_ids]
-
-        retry_waypoint = max_pose_error > pose_threshold or np.linalg.norm(dq) > joint_step_limit
+        retry_waypoint = False
 
         if singularity_threshold is not None:
             sigular_min, _ = get_singular_values(model, check_data, body_id, joint_ids)
@@ -135,13 +113,6 @@ def sample_trajectory(
 ):
     q_waypoints = np.asarray(q_waypoints)
     time_from_start = np.asarray(time_from_start)
-
-    # if qpos_ids is None:
-    #     waypoints = q_waypoints
-    #     qpos_ids = None
-    # else:
-    #     qpos_ids = np.asarray(qpos_ids, dtype=int)
-    #     waypoints = q_waypoints[:, qpos_ids]
 
     qpos_ids = np.asarray(qpos_ids, dtype=int)
     waypoints = q_waypoints[:, qpos_ids]
