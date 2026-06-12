@@ -13,7 +13,7 @@ from sim.model.motion.trajectory import (
     interpolate_position_simple,
 )
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import ct_joint_space, pd_task_space
+from sim_with_mujoco.utils.dynamics import computed_torque_control, pd_task_space
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
 from sim_with_mujoco.utils.math3d import get_body_T

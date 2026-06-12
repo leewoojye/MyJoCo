@@ -91,6 +91,57 @@ def pid_controller():
     return
 
 
+# finger 대상 PD 제어기 (position actuator가 썼던 방식)
+def finger_pd_control(env, alpha, is_left=False, kp=20.0, kd=2.0, tau_max=2.0):
+    model = env.model
+    data = env.data
+    name = "finger_l" if is_left else "finger_r"
+    q_open = 0
+    thumb_q_open = [0.3, 1.57, -0.35, -0.25] if is_left else [0.3, -1.57, 0.35, 0.25]
+    thumb_q_closed = [0.4, 1.25, -0.8, -0.7] if is_left else [0.4, -1.25, 0.8, 0.7]
+
+    for index, i in enumerate(range(1, 5)):
+        joint_name = f"{name}_joint{i}"
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+        qpos_id = model.jnt_qposadr[joint_id]
+        dof_id = model.jnt_dofadr[joint_id]
+
+        q_des = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
+        q = data.qpos[qpos_id]
+        qdot = data.qvel[dof_id]
+
+        tau = kp * (q_des - q) - kd * qdot
+
+        tau = np.clip(tau, -tau_max, tau_max)  # actuator limits에 맞춤
+        if model.actuator_ctrllimited[actuator_id]:
+            lo, hi = model.actuator_ctrlrange[actuator_id]
+            tau = np.clip(tau, lo, hi)
+
+        data.ctrl[actuator_id] = tau
+
+    for i in range(5, 21):
+        joint_name = f"{name}_joint{i}"
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+        qpos_id = model.jnt_qposadr[joint_id]
+        dof_id = model.jnt_dofadr[joint_id]
+
+        q_closed = model.jnt_range[joint_id, 1]
+        q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        q = data.qpos[qpos_id]
+        qdot = data.qvel[dof_id]
+
+        tau = kp * (q_des - q) - kd * qdot
+
+        tau = np.clip(tau, -tau_max, tau_max)  # actuator limits에 맞춤
+        if model.actuator_ctrllimited[actuator_id]:
+            lo, hi = model.actuator_ctrlrange[actuator_id]
+            tau = np.clip(tau, lo, hi)
+
+        data.ctrl[actuator_id] = tau
+
+
 def impedance_control(
     env: Environment, x_des, joint_ids, kp=8, kd=2, twist_des=np.zeros(6), wrench=np.zeros(6), body_id=None
 ):
@@ -103,8 +154,49 @@ def impedance_control(
     twist_current = get_body_twist(env.model, env.data, body_id, joint_ids)
 
     J = get_body_jacobian(env.model, env.data, body_id)[:, dof_ids]
+
     # 오차와 무관하게 넣는 task-space 힘 + 목표 pose로 돌아가려는 spring 힘 + damping 힘
     wrench = wrench + kp * twist_error + kd * (twist_des - twist_current)
-    tau = J.T @ wrench
+    tau = J.T @ wrench  # impedance torque
 
-    return tau
+    return tau + env.data.qfrc_bias[dof_ids]  # 중력 보상항, 추후 수정
+
+
+def finger_impedance_control(env, alpha, kp=0.4, kd=0.08):
+    model = env.model
+    data = env.data
+    name = "finger_r"
+    q_open = 0
+    thumb_q_open = [0.3, -1.57, 0.35, 0.25]
+    thumb_q_closed = [0.4, -1.25, 0.8, 0.7]
+
+    for index, i in enumerate(range(1, 5)):
+        joint_name = f"{name}_joint{i}"
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+        qpos_id = model.jnt_qposadr[joint_id]
+        dof_id = model.jnt_dofadr[joint_id]
+
+        q_des = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
+        tau = kp * (q_des - data.qpos[qpos_id]) - kd * data.qvel[dof_id]
+
+        if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
+            lo, hi = model.actuator_ctrlrange[actuator_id]
+            tau = np.clip(tau, lo, hi)
+        data.ctrl[actuator_id] = tau
+
+    for i in range(5, 21):
+        joint_name = f"{name}_joint{i}"
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+        qpos_id = model.jnt_qposadr[joint_id]
+        dof_id = model.jnt_dofadr[joint_id]
+
+        q_closed = model.jnt_range[joint_id, 1]
+        q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        tau = kp * (q_des - data.qpos[qpos_id]) - kd * data.qvel[dof_id]
+
+        if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
+            lo, hi = model.actuator_ctrlrange[actuator_id]
+            tau = np.clip(tau, lo, hi)
+        data.ctrl[actuator_id] = tau
