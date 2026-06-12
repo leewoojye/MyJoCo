@@ -36,18 +36,38 @@ def quintic_time_scaling(T, t):
     return s_t, s_dot_t, s_ddot_t
 
 
-# 초기 q, qdot, qdotdot은 비영이고 q end는 0을 만족시키는 quintic
-def quintic_interpolate_ros(q_start, q_end, q_dot, q_dotdot, T, t):
+# 구간 양끝의 q, qdot, qdotdot을 만족시키는 quintic
+def quintic_interpolate_ros(
+    q_start,
+    q_end,
+    q_dot_start,
+    q_dotdot_start,
+    T,
+    t,
+    q_dot_end=0,
+    q_dotdot_end=0,
+):
     t = np.clip(t, 0.0, T)
 
-    D = q_end - (q_start + q_dot * T + 0.5 * q_dotdot * T**2)
-
     a0 = q_start
-    a1 = q_dot
-    a2 = 0.5 * q_dotdot
-    a3 = 10.0 * D / T**3 + 4.0 * q_dot / T**2 + 3.5 * q_dotdot / T
-    a4 = -15.0 * D / T**4 - 7.0 * q_dot / T**3 - 6.0 * q_dotdot / T**2
-    a5 = 6.0 * D / T**5 + 3.0 * q_dot / T**4 + 2.5 * q_dotdot / T**3
+    a1 = q_dot_start
+    a2 = 0.5 * q_dotdot_start
+
+    A = np.array(
+        [
+            [T**3, T**4, T**5],
+            [3 * T**2, 4 * T**3, 5 * T**4],
+            [6 * T, 12 * T**2, 20 * T**3],
+        ],
+    )
+    b = np.stack(
+        [
+            q_end - (a0 + a1 * T + a2 * T**2),
+            q_dot_end - (a1 + 2.0 * a2 * T),
+            q_dotdot_end - (2.0 * a2),
+        ],
+    )
+    a3, a4, a5 = np.linalg.solve(A, b)
 
     q = a0 + a1 * t + a2 * t**2 + a3 * t**3 + a4 * t**4 + a5 * t**5
     qdot = a1 + 2 * a2 * t + 3 * a3 * t**2 + 4 * a4 * t**3 + 5 * a5 * t**4
@@ -172,9 +192,27 @@ def interpolate_joint(q_start, q_end, T, t):
     return q_des, q_dot_des, q_dotdot_des
 
 
-# ROS 방식: 초기 q, qdot, qdotdot를 사용자로부터 입력받아 waypoint 생성
-def interpolate_joint_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t):
-    return quintic_interpolate_ros(q_start, q_end, q_dot_start, q_dotdot_start, T, t)
+# ROS 방식: q, qdot, qdotdot 경계조건 기반 waypoint 생성
+def interpolate_joint_ros(
+    q_start,
+    q_end,
+    q_dot_start,
+    q_dotdot_start,
+    T,
+    t,
+    q_dot_end=None,
+    q_dotdot_end=None,
+):
+    return quintic_interpolate_ros(
+        q_start,
+        q_end,
+        q_dot_start,
+        q_dotdot_start,
+        T,
+        t,
+        q_dot_end=q_dot_end,
+        q_dotdot_end=q_dotdot_end,
+    )
 
 
 def interpolate_pose_ros(T_start, T_end, twist_start, twistdot_start, T, t):
@@ -188,9 +226,7 @@ def interpolate_pose_ros(T_start, T_end, twist_start, twistdot_start, T, t):
     w_dot_start = twistdot_start[:3]
     v_dot_start = twistdot_start[3:]
 
-    p_t, p_dot_t, p_dotdot_t = quintic_interpolate_position(
-        p_start, p_end, v_start, v_dot_start, T, t
-    )
+    p_t, p_dot_t, p_dotdot_t = quintic_interpolate_position(p_start, p_end, v_start, v_dot_start, T, t)
 
     rotvec_end = Rotation.from_matrix(R_start.T @ R_end).as_rotvec()
     rotvec_dot_start = R_start.T @ w_start

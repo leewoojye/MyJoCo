@@ -5,7 +5,7 @@ from sim.model.kinematics.ik import calculate_twist_error
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.ik import damped_pseudoinverse
 from sim_with_mujoco.utils.kinematics import get_body_jacobian
-from sim_with_mujoco.utils.math3d import get_body_twist
+from sim_with_mujoco.utils.math3d import get_body_T, get_body_twist
 from sim_with_mujoco.utils.mj import dof_ids_from_joints, joint_ids_from_actuators
 
 
@@ -33,9 +33,8 @@ def pd_joint_space():
     return
 
 
-def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=300, kd=50):
-    # inverse dynamic 계산용
-    inv_data = mujoco.MjData(model)
+def computed_torque_control(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=300, kd=50):
+    inv_data = mujoco.MjData(model)  # inverse dynamic 계산용
     mujoco.mj_copyData(inv_data, model, data)
 
     dof_ids = dof_ids_from_joints(model, joint_ids)
@@ -58,7 +57,7 @@ def ct_joint_space(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=30
     inv_data.qacc[dof_ids] = qacc_des
     mujoco.mj_inverse(model, inv_data)  # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
     # contact constraint는 mj_step이 처리하므로 actuator torque에서 다시 보상하지 않음
-    tau = inv_data.qfrc_inverse[dof_ids] + inv_data.qfrc_constraint[dof_ids]
+    tau = inv_data.qfrc_inverse[dof_ids]
 
     # forcerange 기반 클리핑 (전체 최적화로 계산된 토크 균형이 망가질 것으로 우려, 추후 수정)
     # for i, joint_id in enumerate(joint_ids):
@@ -90,3 +89,22 @@ def pd_task_space(env: Environment, x_des, twist_des, twist_dot_des, joint_ids, 
 
 def pid_controller():
     return
+
+
+def impedance_control(
+    env: Environment, x_des, joint_ids, kp=8, kd=2, twist_des=np.zeros(6), wrench=np.zeros(6), body_id=None
+):
+    if body_id is None:
+        body_id = env.ee_body_id
+
+    dof_ids = np.array([env.model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
+    T_curr = get_body_T(env.data, body_id)
+    _, twist_error = calculate_twist_error(T_curr, x_des)
+    twist_current = get_body_twist(env.model, env.data, body_id, joint_ids)
+
+    J = get_body_jacobian(env.model, env.data, body_id)[:, dof_ids]
+    # 오차와 무관하게 넣는 task-space 힘 + 목표 pose로 돌아가려는 spring 힘 + damping 힘
+    wrench = wrench + kp * twist_error + kd * (twist_des - twist_current)
+    tau = J.T @ wrench
+
+    return tau

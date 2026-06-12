@@ -31,6 +31,22 @@ def get_body_twist(model, data, ee_id, joint_ids):
     twist_current = J @ qvel
     return twist_current
 
+
+# active joint 자코비안의 최소 특이값과 전체 특이값을 반환
+def get_singular_values(model, data, body_id, joint_ids):
+    dof_ids = np.array([model.jnt_dofadr[jid] for jid in joint_ids], dtype=int)
+
+    jacp = np.zeros((3, model.nv))
+    jacr = np.zeros((3, model.nv))
+    mujoco.mj_jacBody(model, data, jacp, jacr, body_id)
+    J = np.vstack([jacr, jacp])[:, dof_ids]
+
+    # 자코비안 행렬 특이값 분해
+    singular_values = np.linalg.svd(J, compute_uv=False)
+
+    return singular_values[-1], singular_values
+
+
 # mj_objectVelocity()을 이용한 현재 바디 트위스트 계산
 def get_body_twist_general(model, data, ee_body_name):
     twist = np.zeros(6)

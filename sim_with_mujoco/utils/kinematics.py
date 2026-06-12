@@ -5,15 +5,15 @@ from sim.model.math3d.transform import create_transform_matrix
 from sim_with_mujoco.utils.mj import joint_ids_from_body
 
 
-# finger position interpolation: q = (1 - grasp) q_open + grasp q_closed
+# finger alpha interpolation: q = (1 - grasp) q_open + grasp q_closed
 def interpolate_finger(model, data, alpha, is_left=False, is_kinematic=False):
     # 네 손가락을 위한 초기 자세
     q_open = 0
 
     # 엄지의 초기 자세는 손바닥과 수직에 가깝고, qpos도 0이 아님
     # 엄지 자세 q를 배열로 표현
-    q_open_list = [0.3, -1.57, 0.35, 0.25]
-    q_closed_list = [0.4, -1.25, 0.8, 0.7]
+    thumb_q_open = [0.3, -1.57, 0.35, 0.25]
+    thumb_q_closed = [0.4, -1.25, 0.8, 0.7]
 
     # 엄지 관절 보간
     for index, i in enumerate(range(1, 5)):  # joint 1부터 4까지 순회
@@ -25,7 +25,7 @@ def interpolate_finger(model, data, alpha, is_left=False, is_kinematic=False):
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
 
-        value = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
+        value = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
         if is_kinematic:
             data.qpos[actuator_id] = value
             continue
@@ -49,35 +49,14 @@ def interpolate_finger(model, data, alpha, is_left=False, is_kinematic=False):
         data.ctrl[actuator_id] = value
 
 
-def interpolate_finger_motor(model, data, alpha, is_left=False, is_kinematic=False):
+# 엄지, 검지 모두 motor actuator인 경우
+def interpolate_finger_motor(env, alpha, is_left=False, is_kinematic=False):
+    model = env.model
     kp = 2.0
     kd = 0.2
     q_open = 0
-    q_open_list = [0.3, -1.57, 0.35, 0.25]
-    q_closed_list = [0.4, -1.25, 0.8, 0.7]
-
-    def set_joint(joint_name, q_des):
-        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
-        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-        if joint_id < 0 or actuator_id < 0:
-            return
-
-        qadr = model.jnt_qposadr[joint_id]
-        dadr = model.jnt_dofadr[joint_id]
-
-        if is_kinematic:
-            data.qpos[qadr] = q_des
-            return
-
-        if model.actuator_biastype[actuator_id] != mujoco.mjtBias.mjBIAS_NONE:
-            ctrl = q_des
-        else:
-            ctrl = kp * (q_des - data.qpos[qadr]) - kd * data.qvel[dadr]
-
-        if model.actuator_ctrllimited[actuator_id]:
-            lo, hi = model.actuator_ctrlrange[actuator_id]
-            ctrl = np.clip(ctrl, lo, hi)
-        data.ctrl[actuator_id] = ctrl
+    thumb_q_open = [0.3, 1.57, -0.35, -0.25] if is_left else [0.3, -1.57, 0.35, 0.25]
+    thumb_q_closed = [0.4, 1.25, -0.8, -0.7] if is_left else [0.4, -1.25, 0.8, 0.7]
 
     for index, i in enumerate(range(1, 5)):
         if is_left:
@@ -85,8 +64,8 @@ def interpolate_finger_motor(model, data, alpha, is_left=False, is_kinematic=Fal
         else:
             joint_name = f"finger_r_joint{i}"
 
-        q_des = (1 - alpha[0]) * q_open_list[index] + alpha[0] * q_closed_list[index]
-        set_joint(joint_name, q_des)
+        q_des = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
+        env.set_joint(joint_name, q_des, is_kinematic=is_kinematic, kp=kp, kd=kd)
 
     for i in range(5, 21):
         if is_left:
@@ -97,7 +76,7 @@ def interpolate_finger_motor(model, data, alpha, is_left=False, is_kinematic=Fal
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         q_closed = model.jnt_range[joint_id, 1]
         q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-        set_joint(joint_name, q_des)
+        env.set_joint(joint_name, q_des, is_kinematic=is_kinematic, kp=kp, kd=kd)
 
 
 def get_dh_params(model, data, body_id):

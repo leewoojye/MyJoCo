@@ -46,6 +46,28 @@ class Environment:
         np.copyto(self.data.ctrl, ctrl)
         return
 
+    # position/motor 액추에이터 ctrl 설정
+    def set_joint(self, joint_name, q_des, is_kinematic=False, kp=2.0, kd=0.2):
+        joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+        actuator_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+
+        qadr = self.model.jnt_qposadr[joint_id]
+        dadr = self.model.jnt_dofadr[joint_id]
+
+        if is_kinematic: # 키네마틱 모드면 data.qpos만 처리
+            self.data.qpos[qadr] = q_des
+            return
+
+        if self.model.actuator_biastype[actuator_id] != mujoco.mjtBias.mjBIAS_NONE:
+            ctrl = q_des
+        else: # 추후 수정
+            ctrl = kp * (q_des - self.data.qpos[qadr]) - kd * self.data.qvel[dadr]
+
+        if self.model.actuator_ctrllimited[actuator_id]:
+            lo, hi = self.model.actuator_ctrlrange[actuator_id]
+            ctrl = np.clip(ctrl, lo, hi)
+        self.data.ctrl[actuator_id] = ctrl
+
     def initial_qpos(self, q_des: dict):  # qpos 초기화, qpos/ctrl 모두 고려
         # self.data.qpos[:] = qpos
         # mujoco.mj_forward(self.model, self.data)
