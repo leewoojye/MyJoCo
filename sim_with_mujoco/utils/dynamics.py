@@ -142,16 +142,17 @@ def impedance_control(
     wrench = wrench + kp * twist_error + kd * (twist_des - twist_current)
     tau = J.T @ wrench  # impedance torque
 
-    return tau  # env.data.qfrc_bias[dof_ids]  # 중력 보상항, 추후 수정
+    return tau
 
 
-def finger_impedance_control(env, alpha, kp=0.05, kd=0.02):
+def finger_impedance_control(env, alpha, kp=0.25, kd=0.08):
     model = env.model
     data = env.data
     name = "finger_r"
     q_open = 0
     thumb_q_open = [0.3, -1.57, 0.35, 0.25]
     thumb_q_closed = [0.4, -1.25, 0.8, 0.7]
+    target_qpos = {}
 
     target_data = mujoco.MjData(model)
     mujoco.mj_copyData(target_data, model, data)
@@ -160,14 +161,18 @@ def finger_impedance_control(env, alpha, kp=0.05, kd=0.02):
         joint_name = f"{name}_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         qpos_id = model.jnt_qposadr[joint_id]
-        target_data.qpos[qpos_id] = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
+        q_des = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
+        target_data.qpos[qpos_id] = q_des
+        target_qpos[joint_name] = q_des
 
     for i in range(5, 21):
         joint_name = f"{name}_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
         qpos_id = model.jnt_qposadr[joint_id]
         q_closed = model.jnt_range[joint_id, 1]
-        target_data.qpos[qpos_id] = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
+        target_data.qpos[qpos_id] = q_des
+        target_qpos[joint_name] = q_des
 
     mujoco.mj_forward(model, target_data)
 
@@ -188,11 +193,15 @@ def finger_impedance_control(env, alpha, kp=0.05, kd=0.02):
         tau = impedance_control(env, target_T, joint_ids, kp=kp, kd=kd, body_id=body_id)
 
         for joint_name, tau_i in zip(joint_names, tau):
+            joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
             actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+            qpos_id = model.jnt_qposadr[joint_id]
+            dof_id = model.jnt_dofadr[joint_id]
+            tau_i += 8.0 * (target_qpos[joint_name] - data.qpos[qpos_id]) - 0.8 * data.qvel[dof_id]
             ctrl = tau_i / model.actuator_gear[actuator_id, 0]
 
             if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
                 lo, hi = model.actuator_ctrlrange[actuator_id]
                 ctrl = np.clip(ctrl, lo, hi)
-                
+
             data.ctrl[actuator_id] = ctrl

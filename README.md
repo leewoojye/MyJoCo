@@ -6,11 +6,11 @@
 ### 26/06/11
 https://youtu.be/gHD_W7J2Uig
 
-00:00 ~ 01:00 Kinematic Simulator Demo
+00:00 ~ 01:00 Kinematic simulator Demo
 
-01:00 ~ 02:00 Dynamic Simulator (position actuator) Demo
+01:00 ~ 02:00 Dynamic simulator (position actuator) Demo
 
-01:00 ~ 02:00 Dynamic Simulator (motor actuator) Demo
+01:00 ~ 02:00 Dynamic simulator (motor actuator) Demo
 
 ## Simulator Overview
 
@@ -39,19 +39,19 @@ pip install -r requirements.txt
 
 Run the simulator:
 
-**Dynamic Simulator using position actuator**
+**Dynamic simulator using position actuator**
 
 ```bash
 python3 -m sim_with_mujoco.dynamic_simulator_position
 ```
 
-**Dynamic Simulator using motor actuator**
+**Dynamic simulator using motor actuator**
 
 ```bash
 python3 -m sim_with_mujoco.dynamic_simulator_motor
 ```
 
-**Kinematic Simulator**
+**Kinematic simulator**
 
 ```bash
 python3 -m sim_with_mujoco.kinematic_simulator
@@ -59,22 +59,27 @@ python3 -m sim_with_mujoco.kinematic_simulator
 
 Use the right-side GUI panels to move the right hand target and control the right-hand grasp sliders.
 
-[update] A GUI panel for adjusting the viewpoint has been added within the viewer.
-
 ## Core Implementation
+
+| 파일 | 상태 갱신 방식 | 궤적 형성 방식 | control 입력 | 물리 계산 | 용도 |
+| --- | --- | --- | --- | --- | --- |
+| dynamic_simulator_position.py | IK 결과를 data.ctrl에 대입 | task-space pose를 interpolate_pose_ros로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco가 내부적으로 PD torque 계산 | mj_step() 사용, qfrc_bias로 중력 보상 실험 | default dynamic simulator, 목표 관절각 트래킹 테스트 |
+| dynamic_simulaotr_motor.py | IK 결과를 joint-space 목표로 만들고 q_des, q_dot_des, q_dotdot_des를 선형 보간 | 목표 pose에 대해 IK를 한 번 풀고 q_start에서 q_goal까지 joint-space 선형 보간 | computed torque로 계산한 torque를 motor actuator data.ctrl에 직접 입력 | mj_step() 사용, 접촉 여부에 따라 손가락 PD torque를 조절하는 실험 | motor actuator 기반 torque-level 제어 실험, grasp/contact 실험 (예정) |
+| kinematic_simulator.py | IK 결과를 data.qpos에 대입 | task-space pose를 interpolate_pose로 보간한 뒤 IK 수행 | torque를 만들지 않고 ctrl만 동기화 | mj_forward() 사용, data.time은 수동 증가 | IK, trajectory 모듈 테스트 |
 
 | 영역 | 구현 내용 |
 | --- | --- |
-| Environment class | model, data, viewer, 초기 qpos, step( ), render( )를 묶어서 관리하는 Environment 클래스 |
-| Viewer class | GLFW window + MjvScene + MjrContext + mjr_render( )을 통합한 뷰어 클래스, event handler에서 polling 중심으로 변경, GLFW 위에 camera 조종 패널 추가 |
+| Environment, Viewer class | model, data, viewer, mujoco API wrapper를 묶어서 관리하는 Environment class / GLFW와 mujoco rendering API를 묶은 Viewer class, camera 조종 패널 추가, event handler에서 polling 중심 구조로 변경 (reference: dm_control) |
 | Kinematic simulation | IK 결과를 data.qpos에 직접 반영하고 mj_forward()로 상태를 갱신 |
-| Dynamic simulation | IK 결과를 actuator ctrl에 넣고 mj_step( )으로 MuJoCo dynamics를 진행 |
-| 시뮬레이션 공통 | rendering, polling, trajectory generation, simulation 시간축 분리 및 적절한 주기(ex. trajectory_duration, poll_interval) 탐색 |
-| Multi IK | 다중 타겟의 jacobian, error를 쌓는 get_stacked_ik( ), damped least squares로 IK 계산, 클리핑 로직 최적화 |
-| Trajectory | position, rotation을 동시에 보간하는 interpolate_pose( ), joint space에서 인접한 두 궤적이 qvel을 공유하게 해 부드러움을 도모하는 interpolate_joint_ros( )(reference: ROS) 구현 |
-| Dynamics utility | solve_inverse_dynamics, computed torque 모듈 구현 |
-| Collision utility | MuJoCo data.contact 기반 robot-table hard collision 판정 |
-| MuJoCo utility | 편의를 위한 MuJoCo API wrapper (ex. joint id, dof id, actuator id를 매핑) |
+| Dynamic simulation | IK 결과를 actuator ctrl에 넣고 mj_step( )으로 mujoco dynamics 진행 |
+| 시뮬레이션 공통 | rendering, polling, trajectory generation(plan), simulation 시간축 분리 및 적절한 주기(ex. trajectory_duration, poll_interval) 탐색 |
+| Multi IK | multi target의 jacobian, error를 쌓는 get_stacked_ik( ), damped least squares로 IK 계산, 클리핑 로직 최적화 |
+| Trajectory | pose interpolation, joint-space interpolation, 부드러운 궤적 전환을 위한 blending |
+| Planning(현재 미사용) | joint trajectory planner: 궤적들 간 qvel을 공유 + singularity check (reference: ROS2) |
+| Dynamics utility | computed torque, PD, impedance control 함수 구현 |
+| Collision utility | mujoco data.contact 기반 robot-table, finger-object 접촉 판정 |
+| mujoco utility | 편의를 위한 mujoco API wrapper (ex. joint id, dof id, actuator id를 매핑) |
+| Assets | motor actuator로 구성된 ffw_sh5_motor_arms_fingers.xml |
 | Experiments files | joint_space_ctorque_test.py, task_space_pd_test.py |
 
 ## Project Structure
@@ -84,18 +89,18 @@ sim_with_mujoco/
   dynamic_simulator.py          ctrl 입력을 받고 env.step()을 호출하는 entry point
   kinematic_simulator.py        IK 결과를 data.qpos에 넣고 mj_forward()를 호출하는 entry point
   environment/
-    env.py                      MjModel, MjData, viewer, step/render wrapper
+    env.py                      viewer, step, render 등을 아우르는 wrapper이자 mjModel, mjData과 관련된 로직을 한데 모은 컨트롤러 역할
   mjcf/
-    parser.py                   MJCF에서 MjModel, MjData 추출
+    parser.py                   MJCF에서 mjModel, mjData 추출
   utils/
     ik.py                       damped_pseudoinverse를 계산하고 multi-target IK 결과 반환
     kinematics.py               finger interpolation, body/site Jacobian helper
     dynamics.py                 inverse dynamics, computed torque, task-space PD
-    collision.py                MuJoCo contact 기반 hard collision check (kinematic_simulator용)
+    collision.py                mujoco contact 기반 hard collision check (kinematic_simulator용)
     math3d.py                   body/site transform, body twist calculation
     mj.py                       joint id, dof id, actuator id mapping helper
   viewer/
-    viewer.py                   MuJoCo renderer와 GUI panel 통합
+    viewer.py                   mujoco renderer와 GUI panel 통합
     glfw_panel.py               hand target panel
     gui_panel.py                camera control panel
   test/

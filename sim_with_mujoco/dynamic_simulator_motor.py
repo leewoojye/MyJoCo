@@ -78,8 +78,8 @@ def main():
     initial_q = env.initial_q
 
     # 주기 상수
-    sim_steps_per_frame = 1 # 궤적 형성
-    steps_per_sim = 8 # 궤
+    sim_steps_per_frame = 1  # 궤적 형성
+    steps_per_sim = 8  # 궤
     poll_interval = 1.0 / 60.0
     render_interval = 1.0 / 60.0
     last_poll_time = 0
@@ -97,7 +97,7 @@ def main():
     q_traj_goal = q_des.copy()
 
     trajectory_start_time = None
-    trajectory_duration = 0.28
+    trajectory_duration = 0.22
     planning_interval = 0.08  # trajectory interval
     last_plan_time = -planning_interval
 
@@ -169,7 +169,7 @@ def main():
                     else:  # simple joint-space interpolation, time-scaling 미사용
                         s = min(t / trajectory_duration, 1.0)
                         q_des[qpos_ids] = q_traj_start + s * (q_traj_goal - q_traj_start)
-                        q_dot_des = 0.4 * (q_traj_goal - q_traj_start) / trajectory_duration
+                        q_dot_des = 0.7 * (q_traj_goal - q_traj_start) / trajectory_duration
                         q_dotdot_des[:] = 0.0
                 else:
                     q_dot_des = np.zeros(len(joint_ids))
@@ -182,17 +182,17 @@ def main():
                     )
 
                     if finger_contact:  # 오른손
-                        finger_pd_control(env, alpha)
+                        finger_pd_control(env, alpha, kp=35.0, kd=3.0, tau_max=4.0)
                         # finger_impedance_control(env, alpha)
                     else:
-                        finger_pd_control(env, alpha, kp=35.0, kd=3.0, tau_max=4.0)
+                        finger_pd_control(env, alpha)
                         # finger_impedance_control(env, alpha)
 
                     interpolate_finger_motor(env, [0, 0], True)  # 왼손
 
                     # finger 제외한 active joints의 computed torque 계산
                     tau_des = computed_torque_control(
-                        env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 30, 10
+                        env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 35, 12
                     )
 
                     for i, joint_id in enumerate(joint_ids):
