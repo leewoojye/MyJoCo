@@ -25,14 +25,6 @@ def solve_inverse_dynamics(model, data, qacc):
     return qfrc_inverse.copy()
 
 
-def taskacc_to_jointacc():
-    return
-
-
-def pd_joint_space():
-    return
-
-
 def computed_torque_control(model, data, q_des, q_dot_des, q_dotdot_des, joint_ids, kp=300, kd=50):
     inv_data = mujoco.MjData(model)  # inverse dynamic 계산용
     mujoco.mj_copyData(inv_data, model, data)
@@ -58,15 +50,6 @@ def computed_torque_control(model, data, q_des, q_dot_des, q_dotdot_des, joint_i
     mujoco.mj_inverse(model, inv_data)  # mj_inverse는 내부적으로 중력항을 고려해 토크를 반환
     # contact constraint는 mj_step이 처리하므로 actuator torque에서 다시 보상하지 않음
     tau = inv_data.qfrc_inverse[dof_ids]
-
-    # forcerange 기반 클리핑 (전체 최적화로 계산된 토크 균형이 망가질 것으로 우려, 추후 수정)
-    # for i, joint_id in enumerate(joint_ids):
-    #     joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
-    #     actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-
-    #     if actuator_id >= 0 and model.actuator_forcelimited[actuator_id]:
-    #         lo, hi = model.actuator_ctrlrange[actuator_id]  # 모델마다 range명 상이
-    #         tau[i] = np.clip(tau[i], lo, hi)
 
     return tau
 
@@ -159,10 +142,10 @@ def impedance_control(
     wrench = wrench + kp * twist_error + kd * (twist_des - twist_current)
     tau = J.T @ wrench  # impedance torque
 
-    return tau + env.data.qfrc_bias[dof_ids]  # 중력 보상항, 추후 수정
+    return tau  # env.data.qfrc_bias[dof_ids]  # 중력 보상항, 추후 수정
 
 
-def finger_impedance_control(env, alpha, kp=0.4, kd=0.08):
+def finger_impedance_control(env, alpha, kp=0.05, kd=0.02):
     model = env.model
     data = env.data
     name = "finger_r"
@@ -170,33 +153,46 @@ def finger_impedance_control(env, alpha, kp=0.4, kd=0.08):
     thumb_q_open = [0.3, -1.57, 0.35, 0.25]
     thumb_q_closed = [0.4, -1.25, 0.8, 0.7]
 
+    target_data = mujoco.MjData(model)
+    mujoco.mj_copyData(target_data, model, data)
+
     for index, i in enumerate(range(1, 5)):
         joint_name = f"{name}_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
-        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         qpos_id = model.jnt_qposadr[joint_id]
-        dof_id = model.jnt_dofadr[joint_id]
-
-        q_des = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
-        tau = kp * (q_des - data.qpos[qpos_id]) - kd * data.qvel[dof_id]
-
-        if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
-            lo, hi = model.actuator_ctrlrange[actuator_id]
-            tau = np.clip(tau, lo, hi)
-        data.ctrl[actuator_id] = tau
+        target_data.qpos[qpos_id] = (1 - alpha[0]) * thumb_q_open[index] + alpha[0] * thumb_q_closed[index]
 
     for i in range(5, 21):
         joint_name = f"{name}_joint{i}"
         joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
-        actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
         qpos_id = model.jnt_qposadr[joint_id]
-        dof_id = model.jnt_dofadr[joint_id]
-
         q_closed = model.jnt_range[joint_id, 1]
-        q_des = (1 - alpha[1]) * q_open + alpha[1] * q_closed
-        tau = kp * (q_des - data.qpos[qpos_id]) - kd * data.qvel[dof_id]
+        target_data.qpos[qpos_id] = (1 - alpha[1]) * q_open + alpha[1] * q_closed
 
-        if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
-            lo, hi = model.actuator_ctrlrange[actuator_id]
-            tau = np.clip(tau, lo, hi)
-        data.ctrl[actuator_id] = tau
+    mujoco.mj_forward(model, target_data)
+
+    finger_tasks = [
+        (f"{name}_link4", range(1, 5)),
+        (f"{name}_link8", range(5, 9)),
+        (f"{name}_link12", range(9, 13)),
+        (f"{name}_link16", range(13, 17)),
+        (f"{name}_link20", range(17, 21)),
+    ]
+
+    for body_name, joint_range in finger_tasks:
+        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
+        joint_names = [f"{name}_joint{i}" for i in joint_range]
+        joint_ids = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, joint_name) for joint_name in joint_names]
+        target_T = get_body_T(target_data, body_id)
+
+        tau = impedance_control(env, target_T, joint_ids, kp=kp, kd=kd, body_id=body_id)
+
+        for joint_name, tau_i in zip(joint_names, tau):
+            actuator_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+            ctrl = tau_i / model.actuator_gear[actuator_id, 0]
+
+            if model.actuator_ctrllimited[actuator_id]:  # actuator limits에 맞춤
+                lo, hi = model.actuator_ctrlrange[actuator_id]
+                ctrl = np.clip(ctrl, lo, hi)
+                
+            data.ctrl[actuator_id] = ctrl

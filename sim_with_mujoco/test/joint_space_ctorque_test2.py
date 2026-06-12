@@ -6,16 +6,11 @@ import mujoco
 import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import (
-    interpolate_joint,
-    interpolate_joint_ros,
-    interpolate_pose,
-)
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import ct_joint_space
+from sim_with_mujoco.utils.collision import is_can_finger_contact
+from sim_with_mujoco.utils.dynamics import computed_torque_control, finger_impedance_control, finger_pd_control
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger, interpolate_finger_motor
-from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
 # XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
@@ -79,15 +74,13 @@ def main():
         "arm_r_joint7",
     ]
     env.viewer.init_viewer(env.initial_target_pos)
-    initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
     initial_q = env.initial_q
-    trajectory_goal_q = initial_q.copy()
 
     # 주기 상수
-    sim_steps_per_frame = 1
-    steps_per_sim = 8
-    poll_interval = 1.0 / 10.0
+    sim_steps_per_frame = 1 # 궤적 형성
+    steps_per_sim = 8 # 궤
+    poll_interval = 1.0 / 60.0
     render_interval = 1.0 / 60.0
     last_poll_time = 0
     last_render_time = 0
@@ -102,12 +95,11 @@ def main():
     q_dotdot_des = np.zeros(len(joint_ids))
     q_traj_start = q_des.copy()
     q_traj_goal = q_des.copy()
-    q_dot_traj_start = np.zeros(len(joint_ids))
-    q_dotdot_traj_start = np.zeros(len(joint_ids))
+
     trajectory_start_time = None
-    trajectory_duration = 3.0
-    traj_plan_interval = 0.8  # 궤적형성 주기 지정
-    last_traj_plan = 0
+    trajectory_duration = 0.28
+    planning_interval = 0.08  # trajectory interval
+    last_plan_time = -planning_interval
 
     # 입력 정보 관리
     polled_target = None  # polled: 이번 폴링에 새로 들어온 입력
@@ -118,10 +110,11 @@ def main():
         while not glfw.window_should_close(env.viewer.window):
             for _ in range(sim_steps_per_frame):  # 시뮬레이션 루프
                 glfw.poll_events()
+                # is_dragging = glfw.get_mouse_button(env.viewer.window, glfw.MOUSE_BUTTON_LEFT) == glfw.PRESS
 
                 now = time.time()
 
-                # polled: 이번 폴링에 새로 들어온 입력, pending: 아직 궤적에 반영안된 최신 입력
+                # polled: 이번 폴링에 새로 들어온 입력, pending: 아직 궤적에 반영되지 않은 최신 입력
                 polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
@@ -130,10 +123,8 @@ def main():
                 if polled_target is not None:
                     pending_target = polled_target.copy()
 
-                if (
-                    pending_target is not None and now - last_traj_plan >= traj_plan_interval
-                ):  # 주의: 폴링, 궤적형성 및 적용 주기가 서로 같아 폴링 주기가 짧으면 궤적이 너무 자주 바뀜
-                    last_traj_plan = now
+                if pending_target is not None and env.data.time - last_plan_time >= planning_interval:
+                    last_plan_time = env.data.time
                     trajectory_goal_T = T_des.copy()
                     trajectory_goal_T[:3, 3] = pending_target[:3].copy()
 
@@ -143,66 +134,66 @@ def main():
 
                     alpha[:] = [pending_target[6], pending_target[7]]
 
-                    # ref_data = mujoco.MjData(env.model)
                     mujoco.mj_copyData(ref_data, env.model, env.data)
                     ref_data.qpos[:] = q_des
                     ref_data.qvel[:] = 0.0
                     mujoco.mj_forward(env.model, ref_data)
 
-                    trajectory_goal_q, joint_ids = solve_ik(
+                    q_goal, joint_ids = solve_ik(
                         env.model,
                         ref_data,
-                        [(env.ee_body_id, trajectory_goal_T), (env.left_hand_id, env.left_initial_T)],
+                        [
+                            (env.ee_body_id, trajectory_goal_T),
+                            (env.left_hand_id, env.left_initial_T),
+                        ],
                         is_pose=[True, False],
                         joint_names=ik_joint_names,
                         check_collision=False,
                     )
-                    q_traj_goal = trajectory_goal_q.copy()
-
-                    # 궤적생성시 더 부드러운 궤적을 위해 현재 관절 속도/가속도도 고려함
-                    q_traj_start = (
-                        q_des.copy()
-                    )  # 타임스케일링 함수를 수학적으로 잇기 위해 궤적명령(입력) 그대로 초기화에 사용
-                    q_dot_traj_start = q_dot_des.copy()
-                    q_dotdot_traj_start = q_dotdot_des.copy()
-
+                    qpos_ids = env.model.jnt_qposadr[joint_ids]
+                    q_traj_start = q_des[qpos_ids].copy()
+                    q_traj_goal = q_goal[qpos_ids].copy()
                     trajectory_start_time = env.data.time
                     pending_target = None
 
                 if trajectory_start_time is not None:
                     t = env.data.time - trajectory_start_time
+                    qpos_ids = env.model.jnt_qposadr[joint_ids]
 
                     if t >= trajectory_duration:
                         T_des = trajectory_goal_T.copy()
-                        q_des = q_traj_goal.copy()
+                        q_des[qpos_ids] = q_traj_goal.copy()
                         q_dot_des = np.zeros(len(joint_ids))
                         q_dotdot_des = np.zeros(len(joint_ids))
                         trajectory_start_time = None
-                    else:
-                        qpos_ids = env.model.jnt_qposadr[joint_ids]
-                        q_des_active, q_dot_des, q_dotdot_des = interpolate_joint_ros(
-                            q_traj_start[qpos_ids],
-                            q_traj_goal[qpos_ids],
-                            q_dot_traj_start,
-                            q_dotdot_traj_start,
-                            trajectory_duration,
-                            min(t, trajectory_duration),  # 궤적목표 지나침 방지
-                        )
-                        q_des = q_traj_start.copy()
-                        q_des[qpos_ids] = q_des_active
+                    else:  # simple joint-space interpolation, time-scaling 미사용
+                        s = min(t / trajectory_duration, 1.0)
+                        q_des[qpos_ids] = q_traj_start + s * (q_traj_goal - q_traj_start)
+                        q_dot_des = 0.4 * (q_traj_goal - q_traj_start) / trajectory_duration
+                        q_dotdot_des[:] = 0.0
                 else:
                     q_dot_des = np.zeros(len(joint_ids))
                     q_dotdot_des = np.zeros(len(joint_ids))
 
-                for _ in range(1):  # 수정 예정
-                    # 옵션 1: dynamic update (dynamic simulation)
-                    qpos_ids = env.model.jnt_qposadr[joint_ids]
+                for _ in range(steps_per_sim):  # 충돌 감지, mj_step()을 한 iteration으로 묶음
+                    finger_contact = is_can_finger_contact(  # 추후 수정
+                        env.model,
+                        env.data,
+                    )
 
-                    interpolate_finger_motor(env.model, env.data, alpha)
-                    interpolate_finger_motor(env.model, env.data, [0, 0], True)
+                    if finger_contact:  # 오른손
+                        finger_pd_control(env, alpha)
+                        # finger_impedance_control(env, alpha)
+                    else:
+                        finger_pd_control(env, alpha, kp=35.0, kd=3.0, tau_max=4.0)
+                        # finger_impedance_control(env, alpha)
 
-                    # 관절공간에서 computed torque 계산
-                    tau_des = ct_joint_space(env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 40, 12)
+                    interpolate_finger_motor(env, [0, 0], True)  # 왼손
+
+                    # finger 제외한 active joints의 computed torque 계산
+                    tau_des = computed_torque_control(
+                        env.model, env.data, q_des, q_dot_des, q_dotdot_des, joint_ids, 30, 10
+                    )
 
                     for i, joint_id in enumerate(joint_ids):
                         actuator_id = None
@@ -224,7 +215,7 @@ def main():
                             ctrl = np.clip(ctrl, lo, hi)
                         env.data.ctrl[actuator_id] = ctrl
 
-                    env.step(steps_per_sim)
+                    env.step(1)
 
             now_ren = time.time()
 
