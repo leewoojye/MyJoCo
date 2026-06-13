@@ -61,10 +61,10 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 ## Core Implementation
 
-| 파일 | 상태 갱신 방식 | 궤적 형성 방식 | control 입력 | 물리 계산 | 용도 |
+| 엔트리 파일 | 상태 갱신 방식 | 궤적 형성 방식 | ctrl 입력 | 물리 계산 | 용도 |
 | --- | --- | --- | --- | --- | --- |
 | dynamic_simulator_position.py | IK 결과를 data.ctrl에 대입 | task-space pose를 interpolate_pose_ros로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco가 내부적으로 PD torque 계산 | mj_step() 사용, qfrc_bias로 중력 보상 실험 | default dynamic simulator, 목표 관절각 트래킹 테스트 |
-| dynamic_simulaotr_motor.py | IK 결과를 joint-space 목표로 만들고 q_des, q_dot_des, q_dotdot_des를 선형 보간 | 목표 pose에 대해 IK를 한 번 풀고 q_start에서 q_goal까지 joint-space 선형 보간 | computed torque로 계산한 torque를 motor actuator data.ctrl에 직접 입력 | mj_step() 사용, 접촉 여부에 따라 손가락 PD torque를 조절하는 실험 | motor actuator 기반 torque-level 제어 실험, grasp/contact 실험 (예정) |
+| dynamic_simulator_motor.py | IK 결과를 joint-space 목표로 만들고 $q$, $\dot{q}$, $\ddot{q}$ 를 선형 보간 | 목표 pose에 대해 IK를 한 번 풀고 q_start에서 q_goal까지 joint-space 선형 보간 | computed torque로 계산한 torque를 motor actuator data.ctrl에 직접 입력 | mj_step() 사용, 접촉 여부에 따라 손가락 PD torque를 조절하는 실험 | motor actuator 기반 torque-level 제어 실험, grasp/contact 실험 (예정) |
 | kinematic_simulator.py | IK 결과를 data.qpos에 대입 | task-space pose를 interpolate_pose로 보간한 뒤 IK 수행 | torque를 만들지 않고 ctrl만 동기화 | mj_forward() 사용, data.time은 수동 증가 | IK, trajectory 모듈 테스트 |
 
 | 영역 | 구현 내용 |
@@ -78,7 +78,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 | Planning(현재 미사용) | joint trajectory planner: 궤적들 간 qvel을 공유 + singularity check (reference: ROS2) |
 | Dynamics utility | computed torque, PD, impedance control 함수 구현 |
 | Collision utility | mujoco data.contact 기반 robot-table, finger-object 접촉 판정 |
-| mujoco utility | 편의를 위한 mujoco API wrapper (ex. joint id, dof id, actuator id를 매핑) |
+| mujoco utility | 편의를 위한 mujoco API wrapper (ex. joint id, dof id, actuator id 매핑) |
 | Assets | motor actuator로 구성된 ffw_sh5_motor_arms_fingers.xml |
 | Experiments files | joint_space_ctorque_test.py, task_space_pd_test.py |
 
