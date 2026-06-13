@@ -1,5 +1,5 @@
 
-![Simulator preview](/assets/images/img3.png)
+![Simulator preview](/assets/images/img5.png)
 
 ## DEMO
 
