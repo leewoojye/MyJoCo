@@ -3,14 +3,14 @@
 
 ## DEMO
 
-### 26/06/11
-https://youtu.be/gHD_W7J2Uig
+### 26/06/12
+https://youtu.be/5F9DRPQdj8Y
 
-00:00 ~ 01:00 Kinematic simulator Demo
+00:03 ~ 01:03 Kinematic simulator Demo
 
-01:00 ~ 02:00 Dynamic simulator (position actuator) Demo
+01:06 ~ 02:30 Dynamic simulator (position) Demo
 
-01:00 ~ 02:00 Dynamic simulator (motor actuator) Demo
+02:33 ~ 03:31 Dynamic simulator (motor) Demo
 
 ## Simulator Overview
 
