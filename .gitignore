@@ -3,6 +3,7 @@
 /temp/
 /.vscode/
 /.cache/
+/.ruff_cache/
 /spot/
 /spots/
 /note.md
