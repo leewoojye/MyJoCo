@@ -1,6 +1,7 @@
 /robotis_mujoco_menagerie/
 /venv/
 /temp/
+/sim_with_mujoco/temp/
 /.vscode/
 /.cache/
 /.ruff_cache/
