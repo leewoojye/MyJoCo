@@ -9,9 +9,10 @@ from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.collision import is_can_finger_contact
 from sim_with_mujoco.utils.dynamics import computed_torque_control, finger_impedance_control, finger_pd_control
-from sim_with_mujoco.utils.ik import solve_ik
+from sim_with_mujoco.utils.ik_qp import solve_differential_ik_qp
 from sim_with_mujoco.utils.kinematics import interpolate_finger, interpolate_finger_motor
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
+# from sim_with_mujoco.temp.metrics import MetricRecorder
 
 # XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms_fingers.xml"
@@ -85,26 +86,18 @@ def main():
     last_poll_time = 0
     last_render_time = 0
 
-    # 궤적 형성 관련 변수
-    trajectory_goal_T = initial_pose.copy()
     T_des = initial_pose.copy()
 
     joint_ids = joint_ids_from_names(env.model, ik_joint_names)
     q_des = initial_q.copy()
     q_dot_des = np.zeros(len(joint_ids))
     q_dotdot_des = np.zeros(len(joint_ids))
-    q_traj_start = q_des.copy()
-    q_traj_goal = q_des.copy()
-
-    trajectory_start_time = None
-    trajectory_duration = 0.22
-    planning_interval = 0.08  # trajectory interval
-    last_plan_time = -planning_interval
+    # recorder = MetricRecorder("ik_test2", joint_ids)
 
     # 입력 정보 관리
     polled_target = None  # polled: 이번 폴링에 새로 들어온 입력
-    pending_target = None  # pending: 아직 궤적에 반영안된 최신 입력
-    alpha = np.zeros(2)
+    alpha_target = np.zeros(2)
+    alpha_cmd = alpha_target.copy()
 
     try:
         while not glfw.window_should_close(env.viewer.window):
@@ -114,79 +107,55 @@ def main():
 
                 now = time.time()
 
-                # polled: 이번 폴링에 새로 들어온 입력, pending: 아직 궤적에 반영되지 않은 최신 입력
                 polled_target = None
                 if now - last_poll_time >= poll_interval:
                     last_poll_time = now
                     polled_target, polled_camera = env.viewer.poll_target()
 
                 if polled_target is not None:
-                    pending_target = polled_target.copy()
+                    T_des = initial_pose.copy()
+                    T_des[:3, 3] = polled_target[:3].copy()
 
-                if pending_target is not None and env.data.time - last_plan_time >= planning_interval:
-                    last_plan_time = env.data.time
-                    trajectory_goal_T = T_des.copy()
-                    trajectory_goal_T[:3, 3] = pending_target[:3].copy()
-
-                    target_rpy = pending_target[3:]
+                    target_rpy = polled_target[3:]
                     target_rot = rpy2rotation_matrix(target_rpy[0], target_rpy[1], target_rpy[2])
-                    trajectory_goal_T[:3, :3] = initial_pose[:3, :3] @ target_rot
+                    T_des[:3, :3] = initial_pose[:3, :3] @ target_rot
 
-                    alpha[:] = [pending_target[6], pending_target[7]]
+                    alpha_target[:] = [polled_target[6], polled_target[7]]
 
+                for _ in range(steps_per_sim):  # 충돌 감지, mj_step()을 한 iteration으로 묶음
                     mujoco.mj_copyData(ref_data, env.model, env.data)
                     ref_data.qpos[:] = q_des
                     ref_data.qvel[:] = 0.0
                     mujoco.mj_forward(env.model, ref_data)
 
-                    q_goal, joint_ids = solve_ik(
+                    q_des, q_dot_des, _ = solve_differential_ik_qp(
                         env.model,
                         ref_data,
                         [
-                            (env.ee_body_id, trajectory_goal_T),
-                            (env.left_hand_id, env.left_initial_T),
-                        ],
-                        is_pose=[True, False],
-                        joint_names=ik_joint_names,
-                        check_collision=False,
+                            (env.ee_body_id, T_des, True, 1.0),
+                            (env.left_hand_id, env.left_initial_T, False, 4.0),
+                        ],  # 에러 벡터 비율에 비례하여 왼손 position IK에 가중치
+                        joint_ids,
+                        env.model.opt.timestep,
                     )
-                    qpos_ids = env.model.jnt_qposadr[joint_ids]
-                    q_traj_start = q_des[qpos_ids].copy()
-                    q_traj_goal = q_goal[qpos_ids].copy()
-                    trajectory_start_time = env.data.time
-                    pending_target = None
+                    q_dotdot_des[:] = 0.0
 
-                if trajectory_start_time is not None:
-                    t = env.data.time - trajectory_start_time
-                    qpos_ids = env.model.jnt_qposadr[joint_ids]
-
-                    if t >= trajectory_duration:
-                        T_des = trajectory_goal_T.copy()
-                        q_des[qpos_ids] = q_traj_goal.copy()
-                        q_dot_des = np.zeros(len(joint_ids))
-                        q_dotdot_des = np.zeros(len(joint_ids))
-                        trajectory_start_time = None
-                    else:  # simple joint-space interpolation, time-scaling 미사용
-                        s = min(t / trajectory_duration, 1.0)
-                        q_des[qpos_ids] = q_traj_start + s * (q_traj_goal - q_traj_start)
-                        q_dot_des = 0.7 * (q_traj_goal - q_traj_start) / trajectory_duration
-                        q_dotdot_des[:] = 0.0
-                else:
-                    q_dot_des = np.zeros(len(joint_ids))
-                    q_dotdot_des = np.zeros(len(joint_ids))
-
-                for _ in range(steps_per_sim):  # 충돌 감지, mj_step()을 한 iteration으로 묶음
                     finger_contact = is_can_finger_contact(  # 추후 수정
                         env.model,
                         env.data,
                     )
 
+                    # finger 목표 alpha를 dt 후 명령 alpha로 변환
+                    dt = env.model.opt.timestep
+                    k_alpha = 30.0
+                    alpha_dot_des = k_alpha * (alpha_target - alpha_cmd)
+                    alpha_cmd += alpha_dot_des * dt
+                    alpha_cmd = np.clip(alpha_cmd, 0.0, 1.0)
+
                     if finger_contact:  # 오른손
-                        finger_pd_control(env, alpha, kp=35.0, kd=3.0, tau_max=4.0)
-                        # finger_impedance_control(env, alpha)
+                        finger_pd_control(env, alpha_cmd)
                     else:
-                        finger_pd_control(env, alpha)
-                        # finger_impedance_control(env, alpha)
+                        finger_pd_control(env, alpha_cmd, kp=40.0, kd=3.0, tau_max=4.0)
 
                     interpolate_finger_motor(env, [0, 0], True)  # 왼손
 
@@ -216,6 +185,7 @@ def main():
                         env.data.ctrl[actuator_id] = ctrl
 
                     env.step(1)
+                    # recorder.record(env, T_des, q_des, tau_des)
 
             now_ren = time.time()
 
