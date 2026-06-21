@@ -1,4 +1,3 @@
-from pyexpat import model
 import time
 
 import glfw
@@ -6,18 +5,10 @@ import mujoco
 import numpy as np
 
 from sim.model.math3d.rotation import rpy2rotation_matrix
-from sim.model.motion.trajectory import (
-    interpolate_pose,
-    interpolate_pose_ros,
-    interpolate_position_cubic,
-    interpolate_position_quintic,
-    interpolate_position_simple,
-)
+from sim.model.motion.trajectory import interpolate_pose_ros
 from sim_with_mujoco.environment.env import Environment
-from sim_with_mujoco.utils.dynamics import computed_torque_control
 from sim_with_mujoco.utils.ik import solve_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger
-from sim_with_mujoco.utils.math3d import get_body_T
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5.xml"
@@ -54,10 +45,6 @@ def main():
     env = Environment(XML_PATH, "arm_r_link7")  # MjModel, MjData, viewer 초기화 및 e.e 지정
     env.initial_qpos(initial_qpos)
 
-    # 임시 MjData (forward, step 중복 계산 방지용)
-    temp_data = mujoco.MjData(env.model)
-    mujoco.mj_copyData(temp_data, env.model, env.data)
-    mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
     ref_data = mujoco.MjData(env.model)
 
     ik_joint_names = [
@@ -77,8 +64,14 @@ def main():
         "arm_r_joint6",
         "arm_r_joint7",
     ]
+    joint_ids = joint_ids_from_names(env.model, ik_joint_names)
+    actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
+    finger_joint_names = [f"finger_r_joint{i}" for i in range(1, 21)] + [f"finger_l_joint{i}" for i in range(1, 21)]
+    gravity_joint_names = ik_joint_names + finger_joint_names
+    all_joint_ids = joint_ids_from_names(env.model, gravity_joint_names)
+    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
+
     env.viewer.init_viewer(env.initial_target_pos)
-    initial_target_pos = env.initial_target_pos
     initial_pose = env.initial_pose
     initial_q = env.initial_q
     q_des = initial_q.copy()
@@ -87,9 +80,7 @@ def main():
     sim_steps_per_frame = 1
     steps_per_sim = 8
     poll_interval = 1.0 / 20.0
-    render_interval = 1.0 / 60.0
     last_poll_time = 0
-    last_render_time = 0
 
     # 궤적 형성 관련 변수
     trajectory_start = initial_pose.copy()  # 단일 궤적의 시작 지점
@@ -151,7 +142,7 @@ def main():
 
                 if trajectory_start_time is not None:
                     pos_err = np.linalg.norm(trajectory_goal[:3, 3] - T_des[:3, 3])
-                    rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])
+                    rot_err = np.linalg.norm(trajectory_goal[:3, :3] - T_des[:3, :3])  # 추후 수정
                     if pos_err <= 1e-5 and rot_err <= 1e-5:
                         T_des = trajectory_goal.copy()
                         twist_des = np.zeros(6)
@@ -172,24 +163,21 @@ def main():
                 else:
                     T_des = trajectory_goal.copy()
 
-                new_target = T_des.copy()
-
                 mujoco.mj_copyData(ref_data, env.model, env.data)
                 ref_data.qpos[:] = q_des
                 ref_data.qvel[:] = 0.0
                 mujoco.mj_forward(env.model, ref_data)
 
-                q_des, joint_ids = solve_ik(
+                q_des, _ = solve_ik(
                     env.model,
                     ref_data,
-                    [(env.ee_body_id, new_target), (env.left_hand_id, env.left_initial_T)],
+                    [(env.ee_body_id, T_des), (env.left_hand_id, env.left_initial_T)],
                     is_pose=[True, False],
                     joint_names=ik_joint_names,
                     check_collision=False,
                 )
-                actuator_ids = actuator_ids_from_joints(env.model, joint_ids)
 
-                for _ in range(1):  # 수정 예정
+                for _ in range(steps_per_sim):  # 수정 예정
                     # IK solver result로 qpos(kinematic simulation용) 또는 ctrl(dynamic simulation용)을 갱신
                     # 옵션 1: dynamic update (dynamic simulation)
                     for actuator_id in actuator_ids:
@@ -209,32 +197,16 @@ def main():
                     interpolate_finger(env.model, env.data, alpha)  # ctrl을 갱신하도록 수정
                     interpolate_finger(env.model, env.data, [0, 0], True)  # 왼손 자세 유지
 
-                    # 옵션 1
-                    # mujoco.mj_copyData(temp_data, env.model, env.data)
-                    # mujoco.mj_forward(env.model, temp_data)  # qfrc_bias 계산을 위한 forward
-
-                    finger_joint_names = [f"finger_r_joint{i}" for i in range(1, 21)] + [
-                        f"finger_l_joint{i}" for i in range(1, 21)
-                    ]
-                    gravity_joint_names = ik_joint_names + finger_joint_names
-                    all_joint_ids = joint_ids_from_names(env.model, gravity_joint_names)
-                    all_dof_ids = dof_ids_from_joints(env.model, all_joint_ids)
-
                     mujoco.mj_forward(env.model, env.data)
                     env.data.qfrc_applied[all_dof_ids] = 0.0
                     env.data.qfrc_applied[all_dof_ids] = env.data.qfrc_bias[all_dof_ids]
-                    env.step(steps_per_sim)
+                    env.step(1)
 
                     # 옵션 2
                     # env.data.qvel[:] = 0.0
                     # # mujoco.mj_forward(env.model, env.data)
                     # env.step(steps_per_sim)
 
-            now_ren = time.time()
-
-            # if now_ren - last_render_time >= render_interval:
-            #     env.viewer.render()
-            #     last_render_time = now_ren
             env.viewer.render()
 
     finally:
