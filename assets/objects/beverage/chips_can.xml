@@ -9,7 +9,9 @@
     <body name="pr_cokeCan" pos="0.70 0 0.78995" quat="1 0 0 0">
       <freejoint/>
       <geom name="chips_can_visual" material="chips_can" mesh="chips_can" class="visual"/>
-      <geom name="chips_can_collision" mesh="chips_can" class="collision"/>
+      <!-- <geom name="chips_can_collision" mesh="chips_can" class="collision"/> -->
+      <geom name="chips_can_collision" type="cylinder" size="0.0395 0.1228" pos="0 0 0.1228"
+        mass="1.0865" class="collision"/>
     </body>
   </worldbody>
 </mujoco>

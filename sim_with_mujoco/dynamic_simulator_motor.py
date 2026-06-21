@@ -1,4 +1,3 @@
-from pyexpat import model
 import time
 
 import glfw
@@ -14,7 +13,6 @@ from sim_with_mujoco.utils.kinematics import interpolate_finger, interpolate_fin
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 # from sim_with_mujoco.temp.metrics import MetricRecorder
 
-# XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms.xml"
 XML_PATH = "/Users/woojyelee/workspace/my_robotics/assets/robots/robotis_ffw/scene_ffw_sh5_motor_arms_fingers.xml"
 
 
@@ -80,11 +78,9 @@ def main():
 
     # 주기 상수
     sim_steps_per_frame = 1  # 궤적 형성
-    steps_per_sim = 8  # 궤
+    steps_per_sim = 8
     poll_interval = 1.0 / 60.0
-    render_interval = 1.0 / 60.0
     last_poll_time = 0
-    last_render_time = 0
 
     T_des = initial_pose.copy()
 
@@ -145,7 +141,7 @@ def main():
                         env.data,
                     )
 
-                    # finger 목표 alpha를 dt 후 명령 alpha로 변환
+                    # finger 목표 alpha를 dt 후 명령 alpha로 변환, differential IK에 맞춰 dt 동안 alpha 변화량을 의도한 것이지만 명시된 forcerange 범위가 작아 효과가 미미함
                     dt = env.model.opt.timestep
                     k_alpha = 30.0
                     alpha_dot_des = k_alpha * (alpha_target - alpha_cmd)
@@ -153,7 +149,8 @@ def main():
                     alpha_cmd = np.clip(alpha_cmd, 0.0, 1.0)
 
                     if finger_contact:  # 오른손
-                        finger_pd_control(env, alpha_cmd)
+                        # finger_pd_control(env, alpha_cmd)
+                        finger_pd_control(env, alpha_cmd, kp=20.0, kd=2.0, tau_max=4.0)
                     else:
                         finger_pd_control(env, alpha_cmd, kp=40.0, kd=3.0, tau_max=4.0)
 
@@ -187,11 +184,6 @@ def main():
                     env.step(1)
                     # recorder.record(env, T_des, q_des, tau_des)
 
-            now_ren = time.time()
-
-            # if now_ren - last_render_time >= render_interval:
-            #     env.viewer.render()
-            #     last_render_time = now_ren
             env.viewer.render()
 
     finally:

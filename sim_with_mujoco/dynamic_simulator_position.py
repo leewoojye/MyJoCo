@@ -98,7 +98,7 @@ def main():
     trajectory_duration = 0.06
     trajectory_step = env.model.opt.timestep * steps_per_sim  # 궤적이 시뮬레이션 루프당 진척되는 정도
     traj_plan_interval = poll_interval  # 궤적형성 주기 지정
-    last_traj_plan = 0
+    last_plan_time = 0
 
     # 입력 정보 관리
     polled_target = None  # polled: 이번 폴링에 새로 들어온 입력
@@ -120,8 +120,8 @@ def main():
                 if polled_target is not None:
                     pending_target = polled_target.copy()
 
-                if pending_target is not None and now - last_traj_plan >= traj_plan_interval:
-                    last_traj_plan = now
+                if pending_target is not None and now - last_plan_time >= traj_plan_interval:
+                    last_plan_time = now
                     trajectory_start = T_des.copy()
                     trajectory_start_twist = twist_des.copy()
                     trajectory_start_twistdot = twistdot_des.copy()

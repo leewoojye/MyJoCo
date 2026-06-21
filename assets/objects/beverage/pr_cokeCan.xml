@@ -11,7 +11,9 @@
       <freejoint/>
       <geom material="pr_cokeCan" mesh="pr_cokeCan" class="visual"/>
       <!-- <geom name="coke_geom" type="box" pos="0 0.01 0" size="0.025 0.01 0.025" rgba="1 1 1 0."/> -->
-      <geom mesh="pr_cokeCan_collision_0" class="collision"/>
+      <!-- <geom mesh="pr_cokeCan_collision_0" class="collision"/> -->
+      <geom name="pr_cokeCan_collision" type="cylinder" size="0.0325 0.0605" pos="0 0.0605 0"
+        quat="0.7071068 -0.7071068 0 0" mass="0.375" class="collision"/>
     </body>
   </worldbody>
 </mujoco>
