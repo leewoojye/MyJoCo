@@ -7,8 +7,8 @@ import numpy as np
 from sim.model.math3d.rotation import rpy2rotation_matrix
 from sim_with_mujoco.environment.env import Environment
 from sim_with_mujoco.utils.collision import is_can_finger_contact
-from sim_with_mujoco.utils.dynamics import computed_torque_control, finger_impedance_control, finger_pd_control
-from sim_with_mujoco.utils.ik_qp import solve_differential_ik_qp
+from sim_with_mujoco.utils.dynamics import computed_torque_control, finger_pd_control
+from sim_with_mujoco.utils.ik_qp import solve_differential_ik
 from sim_with_mujoco.utils.kinematics import interpolate_finger, interpolate_finger_motor
 from sim_with_mujoco.utils.mj import actuator_ids_from_joints, dof_ids_from_joints, joint_ids_from_names
 # from sim_with_mujoco.temp.metrics import MetricRecorder
@@ -124,7 +124,7 @@ def main():
                     ref_data.qvel[:] = 0.0
                     mujoco.mj_forward(env.model, ref_data)
 
-                    q_des, q_dot_des, _ = solve_differential_ik_qp(
+                    q_des, q_dot_des, _ = solve_differential_ik(
                         env.model,
                         ref_data,
                         [

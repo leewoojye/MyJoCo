@@ -9,7 +9,7 @@ from sim_with_mujoco.utils.math3d import get_body_T
 
 # QP 기반 differential IK 속도 명령과 다음 관절각 반환
 # input target에 대응하는 q가 아닌 시뮬레이션 시간 동안 이동한 뒤의 q를 반환
-def solve_differential_ik_qp(
+def solve_differential_ik(
     model,
     data,
     targets,
