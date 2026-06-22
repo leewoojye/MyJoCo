@@ -3,6 +3,15 @@
 
 ## DEMO
 
+### 26/06/22
+https://youtu.be/ZT2nsVZF6J0
+
+00:03 ~ 01:14 Kinematic simulator Demo
+
+01:17 ~ 02:32 Dynamic simulator (position) Demo
+
+02:35 ~ 03:29 Dynamic simulator (motor) Demo
+
 ### 26/06/12
 https://youtu.be/5F9DRPQdj8Y
 
@@ -73,8 +82,8 @@ Use the right-side GUI panels to move the right hand target and control the righ
 | Kinematic simulation | IK 결과를 data.qpos에 직접 반영하고 mj_forward()로 상태를 갱신 |
 | Dynamic simulation | IK 결과를 actuator ctrl에 넣고 mj_step( )으로 mujoco dynamics 진행 |
 | 시뮬레이션 공통 | rendering, polling, trajectory generation(plan), simulation 시간축 분리 및 적절한 주기(ex. trajectory_duration, poll_interval) 탐색 |
-| Multi IK | multi target의 jacobian, error를 쌓는 get_stacked_ik( ), damped least squares로 IK 계산, 클리핑 로직 최적화 |
-| Differential IK QP | actual state 기준으로 multi target jacobian을 구성하고, bounded least-squares로 qvel target과 다음 q target 계산 |
+| Multi target IK | multi target의 jacobian, error를 쌓는 get_stacked_ik( ), damped least squares로 IK 계산, 클리핑 로직 최적화 |
+| Differential IK | actual state 기준으로 multi target jacobian을 구성하고, bounded least-squares로 qvel target과 다음 q target 계산 |
 | Trajectory | pose interpolation, joint-space interpolation, 부드러운 궤적 전환을 위한 blending |
 | Dynamics utility | computed torque, PD control 모듈 구현 |
 | Collision utility | mujoco data.contact 기반 robot-table, finger-object 접촉 판정 |
@@ -84,59 +93,57 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 <!-- | Planning(현재 미사용) | joint trajectory planner: 궤적들 간 qvel을 공유 + singularity check (reference: ROS2) | -->
 
-## Project Structure
+### Simulator Structure
 
 ```text
 sim_with_mujoco/
-  dynamic_simulator.py          ctrl 입력을 받고 env.step()을 호출하는 entry point
-  kinematic_simulator.py        IK 결과를 data.qpos에 넣고 mj_forward()를 호출하는 entry point
+  dynamic_simulator_position.py position actuator 기반 dynamic entry
+  dynamic_simulator_motor.py    motor actuator 기반 torque-control entry
+  kinematic_simulator.py        qpos 직접 갱신 기반 kinematic entry
   environment/
-    env.py                      viewer, step, render 등을 아우르는 wrapper이자 mjModel, mjData과 관련된 로직을 한데 모은 컨트롤러 역할
+    env.py                      model, data, viewer wrapper
   mjcf/
-    parser.py                   MJCF에서 mjModel, mjData 추출
+    parser.py                   MJCF parser
   utils/
-    ik.py                       damped_pseudoinverse를 계산하고 multi-target IK 결과 반환
-    kinematics.py               finger interpolation, body/site Jacobian helper
-    dynamics.py                 inverse dynamics, computed torque, task-space PD
-    collision.py                mujoco contact 기반 hard collision check (kinematic_simulator용)
-    math3d.py                   body/site transform, body twist calculation
-    mj.py                       joint id, dof id, actuator id mapping helper
+    ik.py                       DLS multi-target IK
+    ik_qp.py                    differential IK
+    dynamics.py                 CT, PD, task-space control
+    kinematics.py               finger / kinematics helper
+    collision.py                contact helper
+    math3d.py                   transform / twist helper
+    mj.py                       mujoco id mapping helper
+    planning.py                 waypoint / trajectory helper
   viewer/
-    viewer.py                   mujoco renderer와 GUI panel 통합
+    viewer.py                   renderer wrapper
     glfw_panel.py               hand target panel
     gui_panel.py                camera control panel
-  test/
-    joint_space_trajectory_test.py
-    joint_space_ctorque_test.py
-    pd_task_space_test.py
-    dh_params_test.py
 sim/model/motion/
-    trajectory.py               quintic time-scaling 기반 task/joint space 자세 보간
+  trajectory.py                 task / joint trajectory math
 ```
 
-## Limitation (Future Plan)
+## Limitation (Future Implementation Plan)
 
-- IK 행렬이 단순히 stack한 구조라 task 간 우선순위가 없고 직관적으로 position IK를 적용한 왼손의 target error를 과소평가할 것 같습니다. 실제로 시뮬레이션 상에서 왼손은 오른손에 비해 자리를 이탈하는 경우가 많았습니다.
-- IK의 damping과 dq 제한이 singularity, collision 조건까지 만족시키지 않습니다. planning 모듈을 추가해야 합니다.
+- IK 행렬이 단순히 stack한 구조라 task 간 우선순위가 없고 직관적으로 position IK를 적용한 왼손의 target error를 과소평가할 것 같습니다. 실제로 시뮬레이션 상에서 왼손은 오른손에 비해 자리를 이탈하는 경우가 많았습니다. 
+- IK의 damping과 dq 제한이 singularity, collision 조건까지 만족시키지 않습니다. 별도 planning 모듈을 추가하거나 Differential IK 모듈 제약을 보완해야 합니다.
 - 향후에 task-space PD외에 mass matrix, null-space posture control을 포함한 operational space controller를 구현해야 합니다.
 - finger interpolation은 grasp synergy를 모델링하지 않고 open/close alpha를 관절 목표로 직접 매핑해서 손의 실제 닫힘을 충분히 표현하지 못합니다.
-- trajectory generator는 목표 변경을 부드럽게 만들지만 actuator torque, velocity, jerk limit을 동시에 만족하는 time-parameterization은 아닙니다.
 - viewer diagnostics는 visual contact와 body BVH에 의존하고 있어 q_des saturation, ctrl saturation, qfrc_bias 보상 여부 같은 controller 내부 상태를 즉시 확인하기 어렵습니다. timestep별 mjData 대시보드도 만들면 좋을 것 같습니다. 생성된 궤적(ref)을 얼마나 준수했는지 평가하는 지표도 시각화할 수 있습니다.
 - dm_control과 달리 현재 Environment wrapper는 state snapshot과 restore 경계가 약해서 IK용 임시 MjData, simulation MjData, viewer가 보는 MjData가 섞여있습니다.
 - 현재 trajectory duration은 고정값인데, 인접 velocity 등을 바탕으로 동적으로 바꿔볼 수 있습니다.
 - 현재 충돌 감지 모듈은 kinematic rollback 중심이라 접촉면을 따라 미끄러짐을 표현하지 못합니다. 또한 robot-table hard collision에 초점이 맞춰진 모듈을 확장해야 합니다. 한편 kinematic mode 기능 범위가 헷갈려 사용처를 더 조사해야 합니다.
-- 실제 motor actuator를 상대로 joint-space computed torque를 실험해볼 필요가 있습니다.
 - 점진적으로 강화학습 데모를 붙여봅니다.
 
 ## References
 
-- MuJoCo XML modeling documentation
-- MuJoCo computation and API documentation
-- MuJoCo visualization documentation
-- Gymnasium MuJoCo environment API
-- Modern Robotics, Kevin M. Lynch and Frank C. Park: Ch. 3 Rigid-Body Motions, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, Ch. 12 Grasping and Manipulation
+- mujoco XML modeling documentation
+- mujoco computation and API documentation
+- mujoco visualization documentation
+- Gymnasium mujoco environment API
+- Modern Robotics, Kevin M. Lynch and Frank C. Park: Ch. 3 Rigid-Body Motions, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, Ch. 11 Robot Control, Ch. 12 Grasping and Manipulation
+- Drake Differential IK: https://drake.mit.edu/doxygen_cxx/group__planning__kinematics.html
+- robosuite Controllers: https://robosuite.ai/docs/modules/controllers.html
 - dm_control: https://github.com/google-deepmind/dm_control
-- ROBOTIS MuJoCo Menagerie assets: https://github.com/ROBOTIS-GIT/robotis_mujoco_menagerie
+- ROBOTIS mujoco Menagerie assets: https://github.com/ROBOTIS-GIT/robotis_mujoco_menagerie
 - robosuite assets: https://github.com/ARISE-Initiative/robosuite
 
 ## Tech Stack
