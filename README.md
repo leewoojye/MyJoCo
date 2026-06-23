@@ -23,7 +23,7 @@ https://youtu.be/5F9DRPQdj8Y
 
 ## Simulator Overview
 
-Myjoco(feat. mujoco)는 구버전인 mujoco-free 시뮬레이터를 mujoco-based 시뮬레이터로 재탄생한 프로젝트입니다. mjcf을 제외한 Myjoco 코드는 from scratch로 만들어졌으며 제어 및 강화학습으로의 확장을 목표로 합니다.
+MyJoCo(feat. MuJoCo)는 MuJoCo-free 구시뮬레이터를 MuJoCo-based 시뮬레이터로 재탄생한 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
 
 Check out the more detailed implementation journey here !
 
@@ -72,24 +72,23 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 | 엔트리 파일 | 상태 갱신 방식 | 궤적 형성 방식 | ctrl 입력 | 물리 계산 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| dynamic_simulator_position.py | IK 목표 관절각을 position actuator ctrl로 전달 | panel target을 task-space pose로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco position servo가 torque 계산 | mj_step() 사용, qfrc_bias를 qfrc_applied에 더해 중력 보상 실험 | position actuator 기반 baseline dynamic simulator |
-| dynamic_simulator_motor.py | actual/ref state 기반 differential IK로 관절 목표를 갱신 | panel target을 바로 pose target으로 쓰고 매 부분 IK 수행 | arm은 computed torque, finger는 motor PD torque를 data.ctrl에 입력 | mj_step() 사용, 접촉 여부에 따라 finger gain 조절 | motor actuator 기반 torque-level teleoperation / grasp 실험 |
-| kinematic_simulator.py | IK 결과를 data.qpos에 직접 대입 | panel target을 task-space pose로 보간한 뒤 IK 수행 | torque 계산 없이 ctrl만 qpos와 동기화 | mj_forward() 사용, data.time 수동 증가 | IK와 trajectory 동작 확인용 kinematic simulator |
+| dynamic_simulator_position.py | IK 목표 관절각을 position actuator ctrl로 전달 | panel target을 task-space pose로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco position servo가 torque 계산 | mj_step 사용, qfrc_bias를 qfrc_applied에 더해 중력 보상 실험 | baseline dynamic simulator |
+| dynamic_simulator_motor.py | actual/reference state 기반 differential IK로 관절 목표를 갱신 | panel target을 바로 pose target으로 쓰고 매 부분 IK 수행 | arm은 computed torque, finger는 motor PD torque를 data.ctrl에 입력 | mj_step 사용, 접촉 여부에 따라 finger gain 조절 | motor actuator 기반 torque-level teleoperation / grasping 실험 |
+| kinematic_simulator.py | IK 결과를 data.qpos에 직접 대입 | panel target을 task-space pose로 보간한 뒤 IK 수행 | torque 계산 없이 ctrl만 qpos와 동기화 | mj_forward 사용, data.time 수동 증가 | IK와 trajectory 동작 확인용 kinematic simulator |
 
 | 영역 | 구현 내용 |
 | --- | --- |
 | Environment, Viewer class | model, data, viewer, mujoco API wrapper를 묶어서 관리하는 Environment class / GLFW와 mujoco rendering API를 묶은 Viewer class, camera 조종 패널 추가, event handler에서 polling 중심 구조로 변경 (reference: dm_control) |
-| Kinematic simulation | IK 결과를 data.qpos에 직접 반영하고 mj_forward()로 상태를 갱신 |
-| Dynamic simulation | IK 결과를 actuator ctrl에 넣고 mj_step( )으로 mujoco dynamics 진행 |
-| 시뮬레이션 공통 | rendering, polling, trajectory generation(plan), simulation 시간축 분리 및 적절한 주기(ex. trajectory_duration, poll_interval) 탐색 |
-| Multi target IK | multi target의 jacobian, error를 쌓는 get_stacked_ik( ), damped least squares로 IK 계산, 클리핑 로직 최적화 |
-| Differential IK | actual state 기준으로 multi target jacobian을 구성하고, bounded least-squares로 qvel target과 다음 q target 계산 |
-| Trajectory | pose interpolation, joint-space interpolation, 부드러운 궤적 전환을 위한 blending |
-| Dynamics utility | computed torque, PD control 모듈 구현 |
+| Kinematic simulator | IK 결과를 data.qpos에 직접 반영하고 mj_forward로 상태를 갱신 |
+| Dynamic simulator | IK 결과를 actuator ctrl에 넣고 mj_step으로 mujoco dynamics 진행 |
+| 시뮬레이션 공통 | rendering, polling, trajectory generation, simulation 시간축 분리 및 적절한 주기(ex. trajectory_duration, poll_interval) 탐색 |
+| Multi target IK | multi target의 jacobian과 error를 쌓는 get_stacked_ik 함수, damped least squares로 IK 계산, 클리핑 로직 최적화 |
+| Differential IK | actual state 기준으로 multi target jacobian을 구성하고, least-squares로 qvel target과 다음 q target 계산 |
+| Trajectory | pose interpolation(시작점 속도/가속도가 비영으로 부드러운 궤적 전환 도모), joint-space interpolation |
+| Dynamics utility | computed torque, PD controller 모듈을 구현하고, mujoco timestep마다 각각 팔과 손가락 제어를 담당 (reference: robosuite) |
 | Collision utility | mujoco data.contact 기반 robot-table, finger-object 접촉 판정 |
 | mujoco utility | 편의를 위한 mujoco API wrapper (ex. joint id, dof id, actuator id 매핑) |
-| Assets | motor actuator로 구성된 MJCF 파일 추가, 손가락 마디 사이에 self-collision을 exclude 태그로 임시 방지 |
-| Experiments files | joint_space_ctorque_test.py, task_space_pd_test.py |
+| Assets | motor actuator로 구성된 ffw MJCF 파일 추가, 손가락 마디 사이에 self-collision을 exclude 태그로 임시 방지 |
 
 <!-- | Planning(현재 미사용) | joint trajectory planner: 궤적들 간 qvel을 공유 + singularity check (reference: ROS2) | -->
 
