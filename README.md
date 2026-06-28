@@ -73,7 +73,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 | 엔트리 파일 | 상태 갱신 방식 | 궤적 형성 방식 | ctrl 입력 | 물리 계산 | 용도 |
 | --- | --- | --- | --- | --- | --- |
 | dynamic_simulator_position.py | IK 목표 관절각을 position actuator ctrl로 전달 | panel target을 task-space pose로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco position servo가 torque 계산 | mj_step 사용, qfrc_bias를 qfrc_applied에 더해 중력 보상 실험 | baseline dynamic simulator |
-| dynamic_simulator_motor.py | actual/reference state 기반 differential IK로 관절 목표를 갱신 | panel target을 바로 pose target으로 쓰고 매 부분 IK 수행 | arm은 computed torque, finger는 motor PD torque를 data.ctrl에 입력 | mj_step 사용, 접촉 여부에 따라 finger gain 조절 | motor actuator 기반 torque-level teleoperation / grasping 실험 |
+| dynamic_simulator_motor.py | differential IK로 관절 목표를 갱신 | panel target을 바로 pose target으로 쓰고 매 부분 IK 수행 | arm은 computed torque, finger는 motor PD torque를 data.ctrl에 입력 | mj_step 사용, 접촉 여부에 따라 finger gain 조절 | motor actuator 기반 torque-level teleoperation / grasping 실험 |
 | kinematic_simulator.py | IK 결과를 data.qpos에 직접 대입 | panel target을 task-space pose로 보간한 뒤 IK 수행 | torque 계산 없이 ctrl만 qpos와 동기화 | mj_forward 사용, data.time 수동 증가 | IK와 trajectory 동작 확인용 kinematic simulator |
 
 | 영역 | 구현 내용 |
