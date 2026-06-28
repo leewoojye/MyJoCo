@@ -23,13 +23,13 @@ https://youtu.be/5F9DRPQdj8Y
 
 ## Simulator Overview
 
-MyJoCo(feat. MuJoCo)는 MuJoCo-free 구시뮬레이터를 MuJoCo-based 시뮬레이터로 재탄생한 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
+MyJoCo(feat. MuJoCo)는 로봇 모델의 다른 제어 방식을 이해하고 실험할 수 있는 MuJoCo-based 로봇 시뮬레이터 구축 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
 
-<!-- Check out the more detailed implementation journey here !
+Check out the more detailed implementation journey here !
 
-https://leewoojye.github.io/research/2026/06/03/myjoco2.html
+https://leewoojye.github.io/robotics/research/2026/06/03/myjoco3.html
 
-[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe ! -->
+[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe !
 
 ## How to Use
 
@@ -111,13 +111,10 @@ temp/
 ```
 
 ## Limitation (Future Implementation Plan)
-
-- IK 행렬이 단순히 stack한 구조라 task 간 우선순위가 없고 직관적으로 position IK를 적용한 왼손의 target error를 과소평가할 것 같습니다. 실제로 시뮬레이션 상에서 왼손은 오른손에 비해 자리를 이탈하는 경우가 많았습니다. 
+ 
 - IK의 damping과 dq 제한이 singularity, collision 조건까지 만족시키지 않습니다. 별도 planning 모듈을 추가하거나 Differential IK 모듈 제약을 보완해야 합니다.
 - 향후에 task-space PD외에 mass matrix, null-space posture control을 포함한 operational space controller를 구현해야 합니다.
 - finger interpolation은 grasp synergy를 모델링하지 않고 open/close alpha를 관절 목표로 직접 매핑해서 손의 실제 닫힘을 충분히 표현하지 못합니다.
-- viewer diagnostics는 visual contact와 body BVH에 의존하고 있어 q_des saturation, ctrl saturation, qfrc_bias 보상 여부 같은 controller 내부 상태를 즉시 확인하기 어렵습니다. timestep별 mjData 대시보드도 만들면 좋을 것 같습니다. 생성된 궤적(ref)을 얼마나 준수했는지 평가하는 지표도 시각화할 수 있습니다.
-- dm_control과 달리 현재 Environment wrapper는 state snapshot과 restore 경계가 약해서 IK용 임시 MjData, simulation MjData, viewer가 보는 MjData가 섞여있습니다.
 - 현재 trajectory duration은 고정값인데, 인접 velocity 등을 바탕으로 동적으로 바꿔볼 수 있습니다.
 - 현재 충돌 감지 모듈은 kinematic rollback 중심이라 접촉면을 따라 미끄러짐을 표현하지 못합니다. 또한 robot-table hard collision에 초점이 맞춰진 모듈을 확장해야 합니다. 한편 kinematic mode 기능 범위가 헷갈려 사용처를 더 조사해야 합니다.
 - DexJoCo hand grasp는 tactile feedback, contact-aware grasp planner, force closure optimization 없이 position actuator target과 MuJoCo contact solver에 의존합니다. 작은 물체를 안정적으로 잡으려면 finger force/impedance control 또는 retargeting 기반 hand posture가 추가로 필요합니다.
