@@ -43,8 +43,8 @@ class Viewer:
         self.opt.flags[mujoco.mjtVisFlag.mjVIS_TRANSPARENT] = True
         # self.opt.flags[mujoco.mjtVisFlag.mjVIS_BODYBVH] = True # self-collision 탐지용 바운딩박스 시각화
 
-        self.model.vis.scale.contactwidth = 0.2
-        self.model.vis.scale.contactheight = 0.03
+        self.model.vis.scale.contactwidth = 0.1
+        self.model.vis.scale.contactheight = 0.015
         self.model.vis.rgba.contactpoint[:] = [1.0, 0.15, 0.05, 1.0]
 
         self.scene = mujoco.MjvScene(self.model, maxgeom=10000)

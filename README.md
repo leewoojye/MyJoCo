@@ -1,9 +1,9 @@
 
-![Simulator preview](/assets/images/myjoco3.png)
+![Simulator preview](/assets/images/img6.png)
 
-## DEMO
+<!-- ## DEMO -->
 
-### 26/06/22
+<!-- ### 26/06/22
 https://youtu.be/ZT2nsVZF6J0
 
 00:03 ~ 01:14 Kinematic simulator Demo
@@ -19,17 +19,17 @@ https://youtu.be/5F9DRPQdj8Y
 
 01:06 ~ 02:30 Dynamic simulator (position) Demo
 
-02:33 ~ 03:31 Dynamic simulator (motor) Demo
+02:33 ~ 03:31 Dynamic simulator (motor) Demo -->
 
 ## Simulator Overview
 
 MyJoCo(feat. MuJoCo)는 MuJoCo-free 구시뮬레이터를 MuJoCo-based 시뮬레이터로 재탄생한 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
 
-Check out the more detailed implementation journey here !
+<!-- Check out the more detailed implementation journey here !
 
 https://leewoojye.github.io/research/2026/06/03/myjoco2.html
 
-[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe !
+[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe ! -->
 
 ## How to Use
 
@@ -46,35 +46,25 @@ Install the required Python packages from the project root:
 pip install -r requirements.txt
 ```
 
-Run the simulator:
-
-**Dynamic simulator using position actuator**
+Run the DexJoCo teleop demo:
 
 ```bash
-python3 -m sim_with_mujoco.dynamic_simulator_position
+git clone --depth 1 https://github.com/brave-eai/dexjoco.git temp/dexjoco_src
+python3 -m sim_with_mujoco.dexjoco_teleop
 ```
-
-**Dynamic simulator using motor actuator**
 
 ```bash
-python3 -m sim_with_mujoco.dynamic_simulator_motor
+# If DexJoCo is already cloned elsewhere:
+DEXJOCO_XML_PATH=/path/to/arena_arm_hand_bucket_pick.xml python3 -m sim_with_mujoco.dexjoco_teleop
 ```
 
-**Kinematic simulator**
-
-```bash
-python3 -m sim_with_mujoco.kinematic_simulator
-```
-
-Use the right-side GUI panels to move the right hand target and control the right-hand grasp sliders.
+Use the right-side GUI panels to move the Panda-Allegro target and control the thumb/finger grasp sliders.
 
 ## Core Implementation
 
 | 엔트리 파일 | 상태 갱신 방식 | 궤적 형성 방식 | ctrl 입력 | 물리 계산 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| dynamic_simulator_position.py | IK 목표 관절각을 position actuator ctrl로 전달 | panel target을 task-space pose로 보간한 뒤 IK 수행 | ctrl = target qpos, mujoco position servo가 torque 계산 | mj_step 사용, qfrc_bias를 qfrc_applied에 더해 중력 보상 실험 | baseline dynamic simulator |
-| dynamic_simulator_motor.py | differential IK로 관절 목표를 갱신 | panel target을 바로 pose target으로 쓰고 매 부분 IK 수행 | arm은 computed torque, finger는 motor PD torque를 data.ctrl에 입력 | mj_step 사용, 접촉 여부에 따라 finger gain 조절 | motor actuator 기반 torque-level teleoperation / grasping 실험 |
-| kinematic_simulator.py | IK 결과를 data.qpos에 직접 대입 | panel target을 task-space pose로 보간한 뒤 IK 수행 | torque 계산 없이 ctrl만 qpos와 동기화 | mj_forward 사용, data.time 수동 증가 | IK와 trajectory 동작 확인용 kinematic simulator |
+| dexjoco_teleop.py | DexJoCo Panda-Allegro 모델을 로드하고 arm/site 제어와 hand ctrl을 mj_step으로 갱신 | panel target을 attachment_site pose target으로 직접 사용, grasp slider는 open/close alpha로 매핑 | Panda arm은 operational-space torque를 motor ctrl에 입력, Allegro hand는 position actuator qpos target 입력 | mj_step 사용, hand-object 접촉 friction/condim 및 boxed_food 질량을 런타임 조정 | DexJoCo Panda + Allegro hand teleop grasp demo |
 
 | 영역 | 구현 내용 |
 | --- | --- |
@@ -96,9 +86,7 @@ Use the right-side GUI panels to move the right hand target and control the righ
 
 ```text
 sim_with_mujoco/
-  dynamic_simulator_position.py position actuator 기반 dynamic entry
-  dynamic_simulator_motor.py    motor actuator 기반 torque-control entry
-  kinematic_simulator.py        qpos 직접 갱신 기반 kinematic entry
+  dexjoco_teleop.py            DexJoCo Panda arm + Allegro hand teleop entry
   environment/
     env.py                      model, data, viewer wrapper
   mjcf/
@@ -118,6 +106,8 @@ sim_with_mujoco/
     gui_panel.py                camera control panel
 sim/model/motion/
   trajectory.py                 task / joint trajectory math
+temp/
+  dexjoco_src/                  external DexJoCo clone used by dexjoco_teleop.py
 ```
 
 ## Limitation (Future Implementation Plan)
@@ -130,20 +120,20 @@ sim/model/motion/
 - dm_control과 달리 현재 Environment wrapper는 state snapshot과 restore 경계가 약해서 IK용 임시 MjData, simulation MjData, viewer가 보는 MjData가 섞여있습니다.
 - 현재 trajectory duration은 고정값인데, 인접 velocity 등을 바탕으로 동적으로 바꿔볼 수 있습니다.
 - 현재 충돌 감지 모듈은 kinematic rollback 중심이라 접촉면을 따라 미끄러짐을 표현하지 못합니다. 또한 robot-table hard collision에 초점이 맞춰진 모듈을 확장해야 합니다. 한편 kinematic mode 기능 범위가 헷갈려 사용처를 더 조사해야 합니다.
-- 점진적으로 강화학습 데모를 붙여봅니다.
+- DexJoCo hand grasp는 tactile feedback, contact-aware grasp planner, force closure optimization 없이 position actuator target과 MuJoCo contact solver에 의존합니다. 작은 물체를 안정적으로 잡으려면 finger force/impedance control 또는 retargeting 기반 hand posture가 추가로 필요합니다.
+
+<!-- - DexJoCo object의 friction, contact dimension, boxed_food mass는 demo 조작감을 위해 런타임에서 조정됩니다. 실제 물체 물성 검증이나 실기 재현을 주장하려면 질량, 관성, 마찰, pad compliance를 따로 식별해야 합니다.
+- DexJoCo asset은 repo 내부에 vendoring하지 않고 `temp/dexjoco_src` 또는 `DEXJOCO_XML_PATH`로 참조합니다. 따라서 fresh clone 환경에서는 How to Use의 clone 단계가 필요합니다.
+- 점진적으로 강화학습 데모를 붙여봅니다. -->
 
 ## References
 
-- mujoco XML modeling documentation
-- mujoco computation and API documentation
-- mujoco visualization documentation
-- Gymnasium mujoco environment API
+- mujoco documentation
 - Modern Robotics, Kevin M. Lynch and Frank C. Park: Ch. 3 Rigid-Body Motions, Ch. 5 Velocity Kinematics and Statics, Ch. 6 Inverse Kinematics, Ch. 8 Dynamics of Open Chains, Ch. 9 Trajectory Generation, Ch. 11 Robot Control, Ch. 12 Grasping and Manipulation
 - Drake Differential IK: https://drake.mit.edu/doxygen_cxx/group__planning__kinematics.html
 - robosuite Controllers: https://robosuite.ai/docs/modules/controllers.html
 - dm_control: https://github.com/google-deepmind/dm_control
-- ROBOTIS mujoco Menagerie assets: https://github.com/ROBOTIS-GIT/robotis_mujoco_menagerie
-- robosuite assets: https://github.com/ARISE-Initiative/robosuite
+- DexJoCo: https://github.com/brave-eai/dexjoco
 
 ## Tech Stack
 

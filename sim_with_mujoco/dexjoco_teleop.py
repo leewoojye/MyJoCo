@@ -64,12 +64,10 @@ ALLEGRO_ACTUATOR_NAMES = [
     "tha2",
     "tha3",
 ]
-ALLEGRO_OPEN = np.array(
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.263, 0.0, 0.0, 0.0]
-)
-ALLEGRO_CLOSED = np.array(
-    [0.0, 1.1, 1.1, 0.9, 0.0, 1.1, 1.1, 0.9, 0.0, 1.1, 1.1, 0.9, 0.85, 0.45, 1.0, 0.8]
-)
+ALLEGRO_OPEN = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.263, 0.0, 0.0, 0.0])
+ALLEGRO_CLOSED = np.array([0.0, 1.2, 1.0, 0.7, 0.0, 1.2, 1.0, 0.7, 0.0, 1.2, 1.0, 0.7, 1.0, 0.2, 0.8, 0.6])
+ALLEGRO_BODY_PREFIXES = ("ff_", "mf_", "rf_", "th_")
+OBJECT_BODY_PREFIXES = ("boxed_food", "bucket")
 
 
 def mj_id(model, objtype, name):
@@ -99,11 +97,7 @@ def rotation_vector(R):
     if theta < 1e-8:
         return 0.5 * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
 
-    return (
-        theta
-        / (2.0 * np.sin(theta))
-        * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
-    )
+    return theta / (2.0 * np.sin(theta)) * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
 
 
 def clamp_ctrl(model, actuator_id_i, ctrl):
@@ -111,6 +105,20 @@ def clamp_ctrl(model, actuator_id_i, ctrl):
         lo, hi = model.actuator_ctrlrange[actuator_id_i]
         return np.clip(ctrl, lo, hi)
     return ctrl
+
+
+def tune_grasp_contact(model):
+    for geom_id in range(model.ngeom):
+        body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, model.geom_bodyid[geom_id]) or ""
+        is_hand_geom = body_name == "allegro_palm" or body_name.startswith(ALLEGRO_BODY_PREFIXES)
+        is_object_geom = body_name.startswith(OBJECT_BODY_PREFIXES)
+
+        if is_hand_geom:
+            model.geom_friction[geom_id] = [2.0, 0.02, 0.001]
+            model.geom_condim[geom_id] = 4
+        elif is_object_geom:
+            model.geom_friction[geom_id] = [1.5, 0.01, 0.001]
+            model.geom_condim[geom_id] = 4
 
 
 def initialize_state(model, data):
@@ -206,6 +214,7 @@ def load_model():
         )
 
     model = mujoco.MjModel.from_xml_path(str(XML_PATH))
+    tune_grasp_contact(model)
     data = mujoco.MjData(model)
     initialize_state(model, data)
     return model, data
@@ -218,7 +227,7 @@ def main():
     target_T = initial_T.copy()
 
     viewer = Viewer(model, data)
-    viewer.init_viewer(initial_T[:3, 3], slider_range=(-0.18, 0.18), rotation_slider_range=(-0.5, 0.5))
+    viewer.init_viewer(initial_T[:3, 3], slider_range=(-0.6, 0.6), rotation_slider_range=(-0.5, 0.5))
     viewer.cam.lookat[:] = [0.0, 0.0, 1.05]
     viewer.cam.distance = 2.4
     viewer.cam.azimuth = 150
