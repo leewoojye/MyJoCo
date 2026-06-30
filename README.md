@@ -1,26 +1,6 @@
 
 ![Simulator preview](/assets/images/img6.png)
 
-<!-- ## DEMO -->
-
-<!-- ### 26/06/22
-https://youtu.be/ZT2nsVZF6J0
-
-00:03 ~ 01:14 Kinematic simulator Demo
-
-01:17 ~ 02:32 Dynamic simulator (position) Demo
-
-02:35 ~ 03:29 Dynamic simulator (motor) Demo
-
-### 26/06/12
-https://youtu.be/5F9DRPQdj8Y
-
-00:03 ~ 01:03 Kinematic simulator Demo
-
-01:06 ~ 02:30 Dynamic simulator (position) Demo
-
-02:33 ~ 03:31 Dynamic simulator (motor) Demo -->
-
 ## Simulator Overview
 
 MyJoCo(feat. MuJoCo)는 로봇 모델의 다른 제어 방식을 이해하고 실험할 수 있는 MuJoCo-based 로봇 시뮬레이터 구축 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
