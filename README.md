@@ -3,7 +3,7 @@
 
 ## Simulator Overview
 
-MyJoCo(feat. MuJoCo)는 로봇 모델의 다른 제어 방식을 이해하고 실험할 수 있는 MuJoCo-based 로봇 시뮬레이터 구축 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
+MyJoCo(feat. MuJoCo)는 로봇 모델의 다른 제어 방식을 이해하고 실험할 수 있는 MuJoCo-based 로봇 시뮬레이터 구축 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 로보틱스 기초를 다지는 목적으로 from scratch로 제작되었습니다.
 
 Check out the more detailed implementation journey here !
 
