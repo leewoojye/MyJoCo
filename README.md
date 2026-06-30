@@ -1,5 +1,5 @@
 
-![Simulator preview](/assets/images/myjoco3.png)
+<!-- ![Simulator preview](/assets/images/myjoco3.png)
 
 ## DEMO
 
@@ -19,17 +19,17 @@ https://youtu.be/5F9DRPQdj8Y
 
 01:06 ~ 02:30 Dynamic simulator (position) Demo
 
-02:33 ~ 03:31 Dynamic simulator (motor) Demo
+02:33 ~ 03:31 Dynamic simulator (motor) Demo -->
 
 ## Simulator Overview
 
 MyJoCo(feat. MuJoCo)는 MuJoCo-free 구시뮬레이터를 MuJoCo-based 시뮬레이터로 재탄생한 프로젝트입니다. MJCF을 제외한 MyJoCo 코드는 vibe coding 없이 from scratch로 제작되었습니다.
 
-Check out the more detailed implementation journey here !
+<!-- Check out the more detailed implementation journey here !
 
 https://leewoojye.github.io/research/2026/06/03/myjoco2.html
 
-[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe !
+[update] A newsletter feature has been added to personal blogs. If you would like to receive the newsletter, please subscribe ! -->
 
 ## How to Use
 
