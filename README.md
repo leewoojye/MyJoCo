@@ -29,22 +29,24 @@ pip install -r requirements.txt
 Run the DexJoCo teleop demo:
 
 ```bash
-git clone --depth 1 https://github.com/brave-eai/dexjoco.git temp/dexjoco_src
 python3 -m sim_with_mujoco.dexjoco_teleop
 ```
 
+Run the Panda-Allegro dynamic motor demo:
+
 ```bash
-# If DexJoCo is already cloned elsewhere:
-DEXJOCO_XML_PATH=/path/to/arena_arm_hand_bucket_pick.xml python3 -m sim_with_mujoco.dexjoco_teleop
+python3 -m sim_with_mujoco.dexjoco_dynamic_motor
 ```
 
-Use the right-side GUI panels to move the Panda-Allegro target and control the thumb/finger grasp sliders.
+```bash
+DEXJOCO_XML_PATH=/path/to/arena_arm_hand_bucket_pick.xml python3 -m sim_with_mujoco.dexjoco_teleop
+```
 
 ## Core Implementation
 
 | 엔트리 파일 | 상태 갱신 방식 | 궤적 형성 방식 | ctrl 입력 | 물리 계산 | 용도 |
 | --- | --- | --- | --- | --- | --- |
-| dexjoco_teleop.py | DexJoCo Panda-Allegro 모델을 로드하고 arm/site 제어와 hand ctrl을 mj_step으로 갱신 | panel target을 attachment_site pose target으로 직접 사용, grasp slider는 open/close alpha로 매핑 | Panda arm은 operational-space torque를 motor ctrl에 입력, Allegro hand는 position actuator qpos target 입력 | mj_step 사용, hand-object 접촉 friction/condim 및 boxed_food 질량을 런타임 조정 | DexJoCo Panda + Allegro hand teleop grasp demo |
+| dexjoco_teleop.py | DexJoCo Panda-Allegro 모델을 로드하고 q_des/ref_data 기준으로 arm target을 갱신 | panel target을 allegro_palm pose target으로 직접 사용, grasp slider는 open/close alpha로 매핑 | Panda arm은 differential IK + computed torque 결과를 motor ctrl에 입력, Allegro hand는 position actuator qpos target 입력 | mj_step 사용, vendored XML에 hand-object 접촉 friction/condim 반영 | dynamic_simulator_motor.py 흐름을 따른 Panda-Allegro dynamic motor demo |
 
 | 영역 | 구현 내용 |
 | --- | --- |
@@ -58,7 +60,7 @@ Use the right-side GUI panels to move the Panda-Allegro target and control the t
 | Dynamics utility | computed torque, PD controller 모듈을 구현하고, mujoco timestep마다 각각 팔과 손가락 제어를 담당 (reference: robosuite) |
 | Collision utility | mujoco data.contact 기반 robot-table, finger-object 접촉 판정 |
 | mujoco utility | 편의를 위한 mujoco API wrapper (ex. joint id, dof id, actuator id 매핑) |
-| Assets | motor actuator로 구성된 ffw MJCF 파일 추가, 손가락 마디 사이에 self-collision을 exclude 태그로 임시 방지 |
+| Assets | motor actuator로 구성된 ffw MJCF 파일 추가, DexJoCo XML/assets를 repo 내부에 vendoring하고 grasp 접촉 물성을 XML에 반영 |
 
 <!-- | Planning(현재 미사용) | joint trajectory planner: 궤적들 간 qvel을 공유 + singularity check (reference: ROS2) | -->
 
@@ -67,6 +69,7 @@ Use the right-side GUI panels to move the Panda-Allegro target and control the t
 ```text
 sim_with_mujoco/
   dexjoco_teleop.py            DexJoCo Panda arm + Allegro hand teleop entry
+  dexjoco_dynamic_motor.py      differential IK + computed torque Panda-Allegro entry
   environment/
     env.py                      model, data, viewer wrapper
   mjcf/
@@ -86,8 +89,8 @@ sim_with_mujoco/
     gui_panel.py                camera control panel
 sim/model/motion/
   trajectory.py                 task / joint trajectory math
-temp/
-  dexjoco_src/                  external DexJoCo clone used by dexjoco_teleop.py
+assets/robots/dexjoco/xmls/
+  arena_arm_hand_bucket_pick.xml vendored DexJoCo scene used by DexJoCo entries
 ```
 
 ## Limitation (Future Implementation Plan)
@@ -99,8 +102,7 @@ temp/
 - 현재 충돌 감지 모듈은 kinematic rollback 중심이라 접촉면을 따라 미끄러짐을 표현하지 못합니다. 또한 robot-table hard collision에 초점이 맞춰진 모듈을 확장해야 합니다. 한편 kinematic mode 기능 범위가 헷갈려 사용처를 더 조사해야 합니다.
 - DexJoCo hand grasp는 tactile feedback, contact-aware grasp planner, force closure optimization 없이 position actuator target과 MuJoCo contact solver에 의존합니다. 작은 물체를 안정적으로 잡으려면 finger force/impedance control 또는 retargeting 기반 hand posture가 추가로 필요합니다.
 
-<!-- - DexJoCo object의 friction, contact dimension, boxed_food mass는 demo 조작감을 위해 런타임에서 조정됩니다. 실제 물체 물성 검증이나 실기 재현을 주장하려면 질량, 관성, 마찰, pad compliance를 따로 식별해야 합니다.
-- DexJoCo asset은 repo 내부에 vendoring하지 않고 `temp/dexjoco_src` 또는 `DEXJOCO_XML_PATH`로 참조합니다. 따라서 fresh clone 환경에서는 How to Use의 clone 단계가 필요합니다.
+<!-- - DexJoCo object의 friction, contact dimension은 vendored XML에 직접 반영되어 있습니다. 실제 물체 물성 검증이나 실기 재현을 주장하려면 질량, 관성, 마찰, pad compliance를 따로 식별해야 합니다.
 - 점진적으로 강화학습 데모를 붙여봅니다. -->
 
 ## References
