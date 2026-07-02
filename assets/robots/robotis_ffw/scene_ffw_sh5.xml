@@ -1,26 +1,55 @@
 <mujoco model="ffw_sh5 scene">
   <include file="ffw_sh5.xml"/>
-  <!-- ffw_sh5 외의 table, can asset 추가 -->
-  <include file="../../objects/realworld/base_table_wood.xml"/>
+  <!-- ffw_sh5 외의 can asset 추가 -->
   <include file="../../objects/beverage/chips_can.xml"/>
 
   <statistic center="0.3 0 0.4" extent="1"/>
 
   <visual>
-    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
-    <rgba haze="0.15 0.25 0.35 1"/>
-    <global azimuth="120" elevation="-20"/>
+    <headlight diffuse=".4 .4 .4" ambient=".5 .5 .5"/>
+    <global azimuth="160" elevation="-20" offheight="2048" offwidth="2048"/>
+    <quality offsamples="8"/>
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
-      markrgb="0.8 0.8 0.8" width="300" height="300"/>
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="32" height="512"/>
+    <texture file="../dexjoco/xmls/table_arena/textures/light-gray-floor-tile.png" type="2d" name="texplane"/>
+    <material name="floorplane" reflectance="0.01" shininess="0.0" specular="0.0" texrepeat="2 2" texture="texplane" texuniform="true"/>
+    <texture file="../dexjoco/xmls/table_arena/textures/steel-brushed.png" type="cube" name="tex-steel-brushed"/>
+    <material name="table_legs_metal" reflectance="0.8" shininess="0.8" texrepeat="1 1" texture="tex-steel-brushed"/>
+    <texture file="../dexjoco/xmls/table_arena/textures/light-gray-plaster.png" type="2d" name="tex-light-gray-plaster"/>
+    <material name="walls_mat" reflectance="0.0" shininess="0.1" specular="0.1" texrepeat="3 3" texture="tex-light-gray-plaster" texuniform="true"/>
+    <texture name="tex-table-beige" builtin="flat" height="512" width="512" rgb1="0.58 0.49 0.41" rgb2="0.58 0.49 0.41"/>
+    <material name="table_beige" reflectance="0.02" shininess="0.05" specular="0.1" texture="tex-table-beige"/>
   </asset>
 
   <worldbody>
-    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
-    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+    <geom name="floor" size="3 3 0.01" type="plane" material="floorplane"/>
+
+    <geom pos="-1.25 2.25 1.5" quat="0.6532815 0.6532815 0.2705981 0.2705981"
+      size="1.06 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" name="wall_leftcorner_visual" material="walls_mat"/>
+    <geom pos="-1.25 -2.25 1.5" quat="0.6532815 0.6532815 -0.2705981 -0.2705981"
+      size="1.06 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" name="wall_rightcorner_visual" material="walls_mat"/>
+    <geom pos="1.25 3 1.5" quat="0.7071 0.7071 0 0"
+      size="1.75 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" name="wall_left_visual" material="walls_mat"/>
+    <geom pos="1.25 -3 1.5" quat="0.7071 -0.7071 0 0"
+      size="1.75 1.5 0.01" type="box" conaffinity="0" contype="0" group="1" name="wall_right_visual" material="walls_mat"/>
+    <geom pos="-2 0 1.5" quat="0.5 0.5 0.5 0.5" size="1.5 1.5 0.01"
+      type="box" conaffinity="0" contype="0" group="1" name="wall_rear_visual" material="walls_mat"/>
+    <geom pos="3 0 1.5" quat="0.5 0.5 -0.5 -0.5" size="3 1.5 0.01"
+      type="box" conaffinity="0" contype="0" group="1" name="wall_front_visual" material="walls_mat"/>
+
+    <body name="table" pos="0.88 0 0">
+      <geom name="table_collision" type="box" size="0.4 0.8 0.03" pos="0 0 0.76" friction="1 0.005 0.0001" group="3"/>
+      <geom name="table_visual" type="box" size="0.4 0.8 0.03" pos="0 0 0.76" contype="0" conaffinity="0" group="1" material="table_beige"/>
+      <site name="table_top" pos="0 0 0.79" size="0.002 0.002 0.002" rgba="0 0 0 0"/>
+
+      <geom pos="0.32 0.72 0.365" type="cylinder" size="0.04 0.365" contype="0" conaffinity="0" group="1" material="table_legs_metal"/>
+      <geom pos="0.32 -0.72 0.365" type="cylinder" size="0.04 0.365" contype="0" conaffinity="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.32 0.72 0.365" type="cylinder" size="0.04 0.365" contype="0" conaffinity="0" group="1" material="table_legs_metal"/>
+      <geom pos="-0.32 -0.72 0.365" type="cylinder" size="0.04 0.365" contype="0" conaffinity="0" group="1" material="table_legs_metal"/>
+    </body>
+
+    <light pos="0 0 3" dir="0 0 -1" diffuse="1 1 1" specular=".3 .3 .3"/>
   </worldbody>
 </mujoco>

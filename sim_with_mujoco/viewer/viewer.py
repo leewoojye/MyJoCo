@@ -12,13 +12,20 @@ class Viewer:
         self.model = model
         self.data = data
 
+    def _initial_camera_lookat(self):
+        can_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pr_cokeCan")
+        if can_body_id >= 0:
+            return self.data.xpos[can_body_id].copy()
+        return np.array([0.0, 0.0, 1.0])
+
     def init_viewer(self, initial_target_pos, slider_range=(-0.2, 0.2), rotation_slider_range=(-0.25, 0.25)):
+        initial_camera_lookat = self._initial_camera_lookat()
         self.hand_pose_panel = GlfwTargetPanel(
             initial_target_pos,
             slider_range=slider_range,
             rotation_slider_range=rotation_slider_range,
         )
-        self.gui_panel = GUIPanel(initial_camera=[180, -20, 3, 1])
+        self.gui_panel = GUIPanel(initial_camera=[180, -20, 3, initial_camera_lookat[2]])
 
         if not glfw.init():
             raise RuntimeError("Failed to initialize GLFW")
@@ -55,7 +62,7 @@ class Viewer:
 
         mujoco.mjv_defaultCamera(self.cam)
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-        self.cam.lookat[:] = [0, 0, 1.0]
+        self.cam.lookat[:] = initial_camera_lookat
         self.cam.distance = 3.0
         self.cam.azimuth = 180
         self.cam.elevation = -20
